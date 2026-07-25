@@ -1,0 +1,9 @@
+{
+  // Dùng TypeScript của workspace (node_modules, hiện 5.9.3) thay vì bản TS
+  // VS Code tự đóng gói. Tránh lệch version: bản TS mới hơn của IDE coi
+  // `baseUrl` là deprecated và đòi `ignoreDeprecations: "6.0"` — trong khi
+  // build (ts-loader) chạy TS 5.9.3 lại từ chối "6.0". Pin về workspace TS
+  // để IDE và build nhất quán.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
