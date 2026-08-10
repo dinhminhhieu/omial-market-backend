@@ -62,3 +62,13 @@ export class PaginationQueryDto {
     return this.pageLimit;
   }
 }
+
+export function parsePaginationQuery(query?: Partial<PaginationQueryDto>) {
+  const pageIndex = Math.max(1, Number(query?.pageIndex) || 1);
+  const pageLimit = Math.min(100, Math.max(1, Number(query?.pageLimit) || 20));
+  const skip = (pageIndex - 1) * pageLimit;
+  const take = pageLimit;
+  const search = query?.search?.trim() || undefined;
+
+  return { pageIndex, pageLimit, skip, take, search };
+}

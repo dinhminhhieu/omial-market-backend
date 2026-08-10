@@ -1,12 +1,7 @@
 import { RmqOptions, Transport } from '@nestjs/microservices';
 
-/**
- * URL RabbitMQ đọc từ env (fallback về guest/guest local nếu chưa set).
- * Đọc TRONG hàm (không đặt hằng ở top-level) để chắc chắn `.env` đã được nạp
- * trước khi lấy giá trị — main.ts nạp dotenv rồi mới gọi các factory này.
- */
 function rabbitmqUrl(): string {
-  return process.env.RABBITMQ_URL ?? 'amqp://guest:guest@localhost:5672';
+  return process.env.RABBITMQ_URL ?? '';
 }
 
 /**

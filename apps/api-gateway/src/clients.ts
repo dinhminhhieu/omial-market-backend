@@ -4,3 +4,4 @@
  * tránh import vòng.
  */
 export const AUTH_CLIENT = 'AUTH_CLIENT';
+export const PRODUCT_CLIENT = 'PRODUCT_CLIENT';

@@ -11,17 +11,17 @@ services:
     volumes:
       - postgres_auth_data:/var/lib/postgresql/data
 
-  # postgres-product:
-  #   image: postgres:16
-  #   container_name: postgres-product
-  #   environment:
-  #     POSTGRES_DB: omial_product_db
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #   ports:
-  #     - "5434:5432"
-  #   volumes:
-  #     - postgres_product_data:/var/lib/postgresql/data
+  postgres-product:
+    image: postgres:16
+    container_name: postgres-product
+    environment:
+      POSTGRES_DB: omial_product_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_product_data:/var/lib/postgresql/data
 
   # postgres-order:
   #   image: postgres:16

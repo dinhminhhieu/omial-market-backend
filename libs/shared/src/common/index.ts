@@ -35,6 +35,9 @@ export * from './pipes/validation-pipe.factory';
 // Config (RabbitMQ transport options)
 export * from './config/rmq.options';
 
+// RMQ (helper gọi RPC từ gateway: timeout + map lỗi → HttpException)
+export * from './rmq/rmq-forwarder';
+
 // Redis (wrapper ioredis dùng chung — opt-in qua RedisModule.forRoot)
 export * from './redis/redis.service';
 export * from './redis/redis.module';
