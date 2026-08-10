@@ -33,9 +33,9 @@ export class MailService implements OnModuleInit {
     }
     try {
       await this.transporter.verify();
-      this.logger.log('✅ SMTP sẵn sàng gửi email');
+      this.logger.log('✅ SMTP ready to send emails');
     } catch (err) {
-      this.logger.error(`SMTP verify thất bại: ${(err as Error).message}.`);
+      this.logger.error(`SMTP verify failed: ${(err as Error).message}.`);
       this.transporter = null;
     }
   }

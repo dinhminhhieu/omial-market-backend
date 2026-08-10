@@ -1,22 +1,39 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { CommonModule, rmqClientOptions } from '@app/shared';
-import { AuthController } from './auth/auth.controller';
-import { AUTH_CLIENT } from './clients';
+import { AUTH_CLIENT, PRODUCT_CLIENT } from './clients';
+import {
+  BrandController,
+  CategoryController,
+  LabelController,
+  OptionTemplateController,
+  ProductController,
+} from './product-service';
+import { AuthController } from './auth-service';
 
 @Module({
   imports: [
     CommonModule,
-    // Đăng ký các "client" RabbitMQ. Mỗi client trỏ tới queue của 1 service.
-    // registerAsync + useFactory: đọc env lúc DI chạy (sau khi dotenv nạp xong).
     ClientsModule.registerAsync([
       {
         name: AUTH_CLIENT,
         useFactory: () =>
           rmqClientOptions(process.env.RMQ_AUTH_QUEUE ?? 'auth_queue'),
       },
+      {
+        name: PRODUCT_CLIENT,
+        useFactory: () =>
+          rmqClientOptions(process.env.RMQ_PRODUCT_QUEUE ?? 'product_queue'),
+      },
     ]),
   ],
-  controllers: [AuthController],
+  controllers: [
+    AuthController,
+    BrandController,
+    LabelController,
+    CategoryController,
+    OptionTemplateController,
+    ProductController,
+  ],
 })
 export class ApiGatewayModule {}
