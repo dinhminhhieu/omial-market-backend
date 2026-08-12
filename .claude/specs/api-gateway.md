@@ -12,7 +12,8 @@ forward qua RabbitMQ tới service, trả kết quả. KHÔNG chứa business lo
 | [clients.ts](../../apps/api-gateway/src/clients.ts) | Token DI cho ClientProxy (`AUTH_CLIENT`, `PRODUCT_CLIENT`, `INVENTORY_CLIENT`). |
 | `auth-service/` | `AuthController` — 8 route `/auth/*`. |
 | `product-service/` | 5 controller: `/brands` `/labels` `/categories` `/option-templates` `/products` (CRUD chuẩn, mỗi cái 5 route). |
-| `inventory-service/` | `InventoryController` — 4 route `/inventory/*`. |
+| `inventory-service/` | `InventoryController` — 5 route `/inventory/*`. |
+| `media/` | Module RIÊNG của gateway (KHÔNG qua RMQ, không ClientProxy) — cấp presigned URL upload ảnh lên MinIO/S3. DTO nằm tại chỗ, không nằm trong event-contracts. |
 
 ## Clients RMQ đã đăng ký
 | Token | Queue (env) | Tới service |
@@ -38,6 +39,12 @@ forward qua RabbitMQ tới service, trả kết quả. KHÔNG chứa business lo
 | `POST /inventory/issue` | `inventory.issue` | Phiếu xuất kho thủ công (hủy/nội bộ/trả NCC) |
 | `POST /inventory/adjust` | `inventory.adjust` | Phiếu kiểm kê (`@HttpCode(200)`) |
 | `GET /inventory/movements` | `inventory.get_movements` | Query params `refType`/`refId`/`page`/`limit` |
+
+### Media (`/media`) — smoke e2e pass 2026-08-12
+- `POST /media/presign-upload` (`PresignUploadDto` → `PresignUploadResponseDto`): validate whitelist ảnh + ≤5MB → ký PUT URL (600s) cho key `products/{uuid}.{ext}` → FE up THẲNG lên MinIO, backend không chạm bytes. `publicUrl` nhét vào `Product.images`.
+- Hạ tầng: MinIO trong docker-compose (`:9000` API, `:9001` console minioadmin/minioadmin), bucket `omial-media` tự tạo + public-READ qua `minio-init`. Env `MINIO_*`, `MEDIA_BUCKET`, `MEDIA_PUBLIC_URL` ở root `.env`. Client cần `forcePathStyle: true` (MinIO dùng path-style URL).
+- ⚠️ SDK v3 mặc định KHÔNG ký Content-Type (`SignedHeaders=host`) — PUT sai type vẫn 200. Ép khớp: `getSignedUrl(..., { signableHeaders: new Set(['content-type']) })`. Size cũng KHÔNG enforce được qua presigned PUT (`size` trong DTO chỉ chặn sớm ở bước xin ký) — muốn chặt phải dùng presigned POST policy (`content-length-range`).
+- TODO: đứng sau AuthGuard (Phase 1) · cron dọn ảnh mồ côi (up rồi không gắn product).
 
 ## Quy ước / lưu ý
 - Gọi RPC qua **`RmqForwarder`** (`@app/shared`, xem [shared-libs.md](shared-libs.md)): controller tạo instance trong constructor `new RmqForwarder(client, 'tên-service')`, handler gọi `this.x.send(PATTERN, payload)`. Timeout 5s + map lỗi RPC → `HttpException`, `TimeoutError` → 504 — KHÔNG tự viết lại `firstValueFrom/timeout/catchError` trong controller mới.

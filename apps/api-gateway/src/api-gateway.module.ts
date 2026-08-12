@@ -11,10 +11,12 @@ import {
 } from './product-service';
 import { AuthController } from './auth-service';
 import { InventoryController } from './inventory-service';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
     CommonModule,
+    MediaModule,
     ClientsModule.registerAsync([
       {
         name: AUTH_CLIENT,

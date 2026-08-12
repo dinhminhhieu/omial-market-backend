@@ -57,7 +57,7 @@ User demo: `demo@omial.dev` / `password123`.
 ## Trạng thái migrate
 | Service | Trạng thái |
 | --- | --- |
-| api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (4 route) |
+| api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (5 route) + module media (presigned upload → MinIO) |
 | auth-service | ✅ pure microservice — **login, register+OTP, verify/resend, quên/reset mật khẩu, refresh (rotation), logout** (OTP + refresh token lưu Redis) |
 | product-service | ✅ pure microservice — **brand, label, category (cây), option-template, product (SIMPLE/OPTION/VARIANT)**. Variant **không còn cột stock** (tồn kho → inventory). Còn thiếu unit test nghiệp vụ |
 | inventory-service | ✅ pure microservice — **sổ cái tồn kho: get_stock (batch), receive, issue (conditional update), adjust (optimistic lock), get_movements** — gateway route + smoke e2e pass. Còn thiếu unit test nghiệp vụ |

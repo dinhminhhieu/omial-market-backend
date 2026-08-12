@@ -136,7 +136,7 @@ export class ProductService {
 
       const existingVariant = await this.prismaService.productVariant.findFirst(
         {
-          where: { sku: { in: variantSkus } },
+          where: { sku: { in: variantSkus }, isDeleted: false },
         },
       );
       if (existingVariant) {
@@ -792,9 +792,6 @@ export class ProductService {
               : undefined,
           },
         });
-        // Transaction interactive của Prisma mặc định timeout 5s — luồng sync bên
-        // trên chạy nhiều query tuần tự (mỗi variant/attribute/item vài query),
-        // sản phẩm nhiều biến thể dễ chạm ngưỡng → P2028 rollback sạch.
       },
       { timeout: 15_000 },
     );

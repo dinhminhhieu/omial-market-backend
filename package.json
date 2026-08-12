@@ -20,7 +20,6 @@
     "db:push:auth": "cd apps/auth-service && prisma db push",
     "db:push:product": "cd apps/product-service && prisma db push",
     "db:migrate:inventory": "cd apps/inventory-service && prisma migrate deploy",
-
     "db:seed": "ts-node -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' apps/auth-service/prisma/seed.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
@@ -30,6 +29,8 @@
     "test:e2e": "jest --config ./apps/omial-market-backend/test/jest-e2e.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1108.0",
+    "@aws-sdk/s3-request-presigner": "^3.1108.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.2",
