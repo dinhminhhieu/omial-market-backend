@@ -6,11 +6,13 @@ export * from './patterns/product-service/category.patterns';
 export * from './patterns/product-service/product.patterns';
 export * from './patterns/product-service/option-template.patterns';
 export * from './patterns/inventory-service/inventory.patterns';
+export * from './patterns/order-service/order.patterns';
 
 // Enums dùng chung
 export * from './enums/otp-purpose.enum';
 export * from './enums/product-type.enum';
 export * from './enums/stock.enum';
+export * from './enums/order-status.enum';
 
 // DTOs (payload + response, dùng chung gateway ↔ service)
 export * from './dto/auth-service/req/login.dto';
@@ -76,3 +78,10 @@ export * from './dto/inventory-service/inventory/req/adjust-stock.dto';
 export * from './dto/inventory-service/inventory/req/get-stock-movements.dto';
 export * from './dto/inventory-service/inventory/res/stock-item-response.dto';
 export * from './dto/inventory-service/inventory/res/stock-movement-response.dto';
+
+// Order-service DTOs — đơn hàng (snapshot + máy trạng thái)
+export * from './dto/order-service/order/req/create-order-item-input.dto';
+export * from './dto/order-service/order/req/create-order.dto';
+export * from './dto/order-service/order/req/find-all-orders.dto';
+export * from './dto/order-service/order/req/update-order-status.dto';
+export * from './dto/order-service/order/res/order-response.dto';

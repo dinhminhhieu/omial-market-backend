@@ -34,6 +34,7 @@ NestJS 11 · pnpm monorepo · RabbitMQ (`@nestjs/microservices` Transport.RMQ) �
 - [.claude/specs/auth-service.md](.claude/specs/auth-service.md) — auth-service (login, register+OTP, refresh, quên mật khẩu)
 - [.claude/specs/product-service.md](.claude/specs/product-service.md) — product-service (brand, label, category, option-template, product + option/variant)
 - [.claude/specs/inventory-service.md](.claude/specs/inventory-service.md) — inventory-service (tồn kho sổ cái: StockItem + StockMovement)
+- [.claude/specs/order-service.md](.claude/specs/order-service.md) — order-service (đơn hàng: snapshot + máy trạng thái + luồng create)
 - [.claude/specs/promotion-service.md](.claude/specs/promotion-service.md) — promotion-service (📐 mới thiết kế schema, chưa code)
 - [.claude/specs/api-gateway.md](.claude/specs/api-gateway.md) — gateway + client RMQ
 - [.claude/specs/shared-libs.md](.claude/specs/shared-libs.md) — libs/shared + libs/event-contracts
@@ -57,9 +58,9 @@ User demo: `demo@omial.dev` / `password123`.
 ## Trạng thái migrate
 | Service | Trạng thái |
 | --- | --- |
-| api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (5 route) + module media (presigned upload → MinIO) |
+| api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (5 route), order (4 route) + module media (presigned upload → MinIO) |
 | auth-service | ✅ pure microservice — **login, register+OTP, verify/resend, quên/reset mật khẩu, refresh (rotation), logout** (OTP + refresh token lưu Redis) |
 | product-service | ✅ pure microservice — **brand, label, category (cây), option-template, product (SIMPLE/OPTION/VARIANT)**. Variant **không còn cột stock** (tồn kho → inventory). Còn thiếu unit test nghiệp vụ |
 | inventory-service | ✅ pure microservice — **sổ cái tồn kho: get_stock (batch), receive, issue (conditional update), adjust (optimistic lock), get_movements** — gateway route + smoke e2e pass. Còn thiếu unit test nghiệp vụ |
-| order | ⬜ chưa migrate (còn REST scaffolding) |
+| order | ✅ pure microservice — **checkout (giá server-side, validate option/tồn qua RMQ service-to-service), máy trạng thái + history, search/phân trang** — gateway route + smoke e2e toàn hệ pass. Chưa reserve kho (Phase 2 saga). Còn thiếu unit test |
 | promotion | 📐 chỉ mới thiết kế schema (campaign 5 trục + sổ cái usage) — code sau khi xong Phase 0 |

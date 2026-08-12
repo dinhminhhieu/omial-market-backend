@@ -1,15 +1,29 @@
+import { config as loadEnv } from 'dotenv';
+import { join } from 'node:path';
+
+// Nạp env TRƯỚC khi khởi động: cần RABBITMQ_URL + tên queue (dựng transport)
+loadEnv();
+loadEnv({ path: join(process.cwd(), 'apps/order-service/.env') });
+
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { setupApp } from '@app/shared';
+import { MicroserviceOptions } from '@nestjs/microservices';
+import { rmqServerOptions, setupMicroservice } from '@app/shared';
 import { OrderServiceModule } from './order-service.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(OrderServiceModule);
-  setupApp(app, { swagger: { title: 'Order Service' } });
+  const queue = process.env.RMQ_ORDER_QUEUE ?? 'order_queue';
 
-  const port = process.env.PORT ?? 3003;
-  await app.listen(port);
-  Logger.log(`🚀 order-service: http://localhost:${port}/api`, 'Bootstrap');
-  Logger.log(`📖 Swagger: http://localhost:${port}/docs`, 'Bootstrap');
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+    OrderServiceModule,
+    rmqServerOptions(queue),
+  );
+  setupMicroservice(app);
+
+  await app.listen();
+  Logger.log(
+    `🚀 order-service listening RabbitMQ queue "${queue}"`,
+    'Bootstrap',
+  );
 }
 bootstrap();

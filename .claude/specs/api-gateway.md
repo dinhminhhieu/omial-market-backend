@@ -21,6 +21,7 @@ forward qua RabbitMQ tới service, trả kết quả. KHÔNG chứa business lo
 | `AUTH_CLIENT` | `RMQ_AUTH_QUEUE` (`auth_queue`) | auth-service |
 | `PRODUCT_CLIENT` | `RMQ_PRODUCT_QUEUE` (`product_queue`) | product-service |
 | `INVENTORY_CLIENT` | `RMQ_INVENTORY_QUEUE` (`inventory_queue`) | inventory-service |
+| `ORDER_CLIENT` | `RMQ_ORDER_QUEUE` (`order_queue`) | order-service |
 
 ## Endpoints (tất cả `@Public`, prefix `/api`)
 
@@ -39,6 +40,14 @@ forward qua RabbitMQ tới service, trả kết quả. KHÔNG chứa business lo
 | `POST /inventory/issue` | `inventory.issue` | Phiếu xuất kho thủ công (hủy/nội bộ/trả NCC) |
 | `POST /inventory/adjust` | `inventory.adjust` | Phiếu kiểm kê (`@HttpCode(200)`) |
 | `GET /inventory/movements` | `inventory.get_movements` | Query params `refType`/`refId`/`page`/`limit` |
+
+### Orders (`/orders`, `ORDER_PATTERNS`) — smoke e2e toàn hệ pass 2026-08-12
+| Method + Path | Pattern | Ghi chú |
+| --- | --- | --- |
+| `POST /orders` | `order.create` | Checkout — FE chỉ gửi id + qty, giá server tính |
+| `GET /orders` | `order.find_all` | filter status + search + phân trang |
+| `GET /orders/:id` | `order.find_one` | kèm items + statusHistory |
+| `PATCH /orders/:id/status` | `order.update_status` | body `UpdateOrderStatusBodyDto` (OmitType bỏ id — id từ param) |
 
 ### Media (`/media`) — smoke e2e pass 2026-08-12
 - `POST /media/presign-upload` (`PresignUploadDto` → `PresignUploadResponseDto`): validate whitelist ảnh + ≤5MB → ký PUT URL (600s) cho key `products/{uuid}.{ext}` → FE up THẲNG lên MinIO, backend không chạm bytes. `publicUrl` nhét vào `Product.images`.
