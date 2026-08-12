@@ -16,6 +16,7 @@ import {
   parsePaginationQuery,
 } from '@app/shared';
 import { Prisma } from '../generated/prisma/client';
+import { assertOptionGroupValid } from '../common/option-group.validator';
 
 @Injectable()
 export class OptionTemplateService {
@@ -34,7 +35,12 @@ export class OptionTemplateService {
       throw new BadRequestException('Mẫu tùy chọn đã tồn tại');
     }
 
-    this.assertValid(dto.minSelect, dto.maxSelect, dto.optionTemplateItems);
+    assertOptionGroupValid(
+      dto.minSelect,
+      dto.maxSelect,
+      dto.optionTemplateItems,
+      'Mẫu tùy chọn',
+    );
 
     const optionTemplate = await this.prismaService.optionTemplate.create({
       data: {
@@ -94,7 +100,7 @@ export class OptionTemplateService {
   ): Promise<OptionTemplateResponseDto> {
     const { id, optionTemplateItems, ...data } = dto;
 
-    await this.findOne(id);
+    const current = await this.findOne(id);
 
     if (data.name) {
       const duplicateName = await this.prismaService.optionTemplate.findFirst({
@@ -103,6 +109,15 @@ export class OptionTemplateService {
       if (duplicateName)
         throw new BadRequestException('Tên mẫu tùy chọn đã tồn tại');
     }
+
+    // Field nào không gửi thì lấy giá trị hiện tại — invariant phải đúng với
+    // TRẠNG THÁI SAU KHI UPDATE, không chỉ với phần payload gửi lên.
+    assertOptionGroupValid(
+      data.minSelect !== undefined ? data.minSelect : current.minSelect,
+      data.maxSelect !== undefined ? data.maxSelect : current.maxSelect,
+      optionTemplateItems ?? current.optionTemplateItems ?? [],
+      'Mẫu tùy chọn',
+    );
 
     const optionTemplate = await this.prismaService.optionTemplate.update({
       where: { id },
@@ -142,34 +157,5 @@ export class OptionTemplateService {
         extraPrice: Number(i.extraPrice),
       })),
     };
-  }
-
-  private assertValid(
-    minSelect: number | undefined,
-    maxSelect: number | null | undefined,
-    items: Array<{ isDefault?: boolean; status?: boolean }>,
-  ): void {
-    const min = minSelect ?? 0;
-    const max = maxSelect ?? null;
-
-    if (max != null && min > max)
-      throw new BadRequestException(
-        'Số lượng tối thiểu không được lớn hơn số lượng tối đa',
-      );
-
-    if (min > items.length)
-      throw new BadRequestException(
-        'Số lượng tối thiểu không được lớn hơn số lượng option',
-      );
-
-    const defaults = items.filter((i) => i.isDefault);
-    if (max != null && defaults.length > max)
-      throw new BadRequestException(
-        'Số option mặc định vượt quá số lượng tối đa',
-      );
-
-    // Chỉ product-option (item có status):
-    if (defaults.some((i) => i.status === false))
-      throw new BadRequestException('Không thể đặt mặc định cho item đang tắt');
   }
 }

@@ -1,0 +1,18 @@
+// Prisma CLI config — nạp .env theo đường dẫn tuyệt đối để chạy được từ mọi CWD
+// (chuẩn chung các service).
+import path from 'path';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+import { defineConfig } from 'prisma/config';
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: {
+    path: 'prisma/migrations',
+  },
+  datasource: {
+    url: process.env['DATABASE_URL'],
+  },
+});

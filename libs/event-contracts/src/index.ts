@@ -1,9 +1,16 @@
 // Message patterns (khoá định danh cho send/emit)
 export * from './patterns/auth-service/auth.patterns';
 export * from './patterns/product-service/brand.patterns';
+export * from './patterns/product-service/label.patterns';
+export * from './patterns/product-service/category.patterns';
+export * from './patterns/product-service/product.patterns';
+export * from './patterns/product-service/option-template.patterns';
+export * from './patterns/inventory-service/inventory.patterns';
 
 // Enums dùng chung
 export * from './enums/otp-purpose.enum';
+export * from './enums/product-type.enum';
+export * from './enums/stock.enum';
 
 // DTOs (payload + response, dùng chung gateway ↔ service)
 export * from './dto/auth-service/req/login.dto';
@@ -59,3 +66,13 @@ export * from './dto/product-service/product-variant/req/variant-attribute-selec
 export * from './dto/product-service/product-variant/req/create-product-variant.dto';
 export * from './dto/product-service/product-variant/res/product-attribute-response.dto';
 export * from './dto/product-service/product-variant/res/product-variant-response.dto';
+
+// Inventory-service DTOs — kho (StockItem + sổ cái StockMovement)
+export * from './dto/inventory-service/inventory/req/stock-ref-input.dto';
+export * from './dto/inventory-service/inventory/req/get-stock.dto';
+export * from './dto/inventory-service/inventory/req/receive-stock.dto';
+export * from './dto/inventory-service/inventory/req/issue-stock.dto';
+export * from './dto/inventory-service/inventory/req/adjust-stock.dto';
+export * from './dto/inventory-service/inventory/req/get-stock-movements.dto';
+export * from './dto/inventory-service/inventory/res/stock-item-response.dto';
+export * from './dto/inventory-service/inventory/res/stock-movement-response.dto';

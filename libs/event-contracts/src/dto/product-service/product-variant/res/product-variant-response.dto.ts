@@ -20,9 +20,6 @@ export class ProductVariantResponseDto {
   @ApiProperty({ required: false, nullable: true })
   saleEndAt?: Date | string | null;
 
-  @ApiProperty()
-  stock: number;
-
   @ApiProperty({ required: false, nullable: true })
   imageUrl?: string;
 

@@ -21,7 +21,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ProductOptionGroupInputDto } from '../../product-option/req/product-option-group-input.dto';
-import { ProductType } from 'apps/product-service/src/generated/prisma/enums';
+import { ProductType } from '../../../../enums/product-type.enum';
 import { CreateProductAttributeDto } from '../../product-variant/req/create-product-attribute.dto';
 import { CreateProductVariantDto } from '../../product-variant/req/create-product-variant.dto';
 

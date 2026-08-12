@@ -21,6 +21,7 @@ import {
   PaginationQueryDto,
   parsePaginationQuery,
 } from '@app/shared';
+import { assertOptionGroupValid } from '../common/option-group.validator';
 
 const defaultInclude = {
   productLabels: { include: { label: true } },
@@ -70,6 +71,16 @@ export class ProductService {
       productAttributes,
       productVariants,
     );
+
+    // Invariant từng nhóm tuỳ chọn (min/max/default) — DB không gác được
+    for (const group of productOptionGroups ?? []) {
+      assertOptionGroupValid(
+        group.minSelect,
+        group.maxSelect,
+        group.productOptionItems ?? [],
+        `Nhóm tuỳ chọn '${group.name}'`,
+      );
+    }
 
     const slug = productData.slug || buildSlugtify(productData.name);
 
@@ -221,7 +232,6 @@ export class ProductService {
               saleEndAt: variantDto.saleEndAt
                 ? new Date(variantDto.saleEndAt)
                 : null,
-              stock: variantDto.stock ?? 0,
               imageUrl: variantDto.imageUrl,
               status: variantDto.status ?? true,
               productId: newProduct.id,
@@ -440,315 +450,354 @@ export class ProductService {
       }
     }
 
-    await this.prismaService.$transaction(async (tx) => {
-      // 1. Nếu chuyển type khác VARIANT ➔ Xóa toàn bộ attributes và variants cũ
-      if (newType !== ProductType.VARIANT) {
-        await tx.productAttribute.deleteMany({ where: { productId: id } });
-        await tx.productVariant.deleteMany({ where: { productId: id } });
-      }
-
-      // 2. Nếu chuyển type khác OPTION ➔ Xóa toàn bộ option groups cũ
-      if (newType !== ProductType.OPTION) {
-        await tx.productOptionGroup.deleteMany({ where: { productId: id } });
-      }
-
-      // 3. Smart Sync ProductOptionGroups (nếu type = OPTION)
-      if (newType === ProductType.OPTION && productOptionGroups) {
-        const existingGroups = currentProduct.productOptionGroups || [];
-        const incomingGroupIds = productOptionGroups
-          .map((g) => g.id)
-          .filter(Boolean);
-
-        const groupIdsToDelete = existingGroups
-          .map((g) => g.id)
-          .filter((gId) => !incomingGroupIds.includes(gId));
-        if (groupIdsToDelete.length > 0) {
-          await tx.productOptionGroup.deleteMany({
-            where: { id: { in: groupIdsToDelete } },
-          });
+    await this.prismaService.$transaction(
+      async (tx) => {
+        // 1. Nếu chuyển type khác VARIANT ➔ Xóa toàn bộ attributes và variants cũ
+        if (newType !== ProductType.VARIANT) {
+          await tx.productAttribute.deleteMany({ where: { productId: id } });
+          await tx.productVariant.deleteMany({ where: { productId: id } });
         }
 
-        for (const group of productOptionGroups) {
-          const { id: groupId, productOptionItems, ...groupData } = group;
-          if (groupId) {
-            const existingGroup = existingGroups.find((g) => g.id === groupId);
-            if (!existingGroup) {
-              throw new BadRequestException(
-                'Nhóm tuỳ chọn không tồn tại hoặc đã bị xoá',
-              );
-            }
-            await tx.productOptionGroup.update({
-              where: { id: groupId },
-              data: groupData,
-            });
+        // 2. Nếu chuyển type khác OPTION ➔ Xóa toàn bộ option groups cũ
+        if (newType !== ProductType.OPTION) {
+          await tx.productOptionGroup.deleteMany({ where: { productId: id } });
+        }
 
-            if (productOptionItems) {
-              const existingItemIds = existingGroup.productOptionItems.map(
-                (i) => i.id,
-              );
-              const incomingItemIds = productOptionItems
-                .map((i) => i.id)
-                .filter(Boolean);
+        // 3. Smart Sync ProductOptionGroups (nếu type = OPTION)
+        if (newType === ProductType.OPTION && productOptionGroups) {
+          const existingGroups = currentProduct.productOptionGroups || [];
+          const incomingGroupIds = productOptionGroups
+            .map((g) => g.id)
+            .filter(Boolean);
 
-              const itemIdsToDelete = existingItemIds.filter(
-                (iId) => !incomingItemIds.includes(iId),
-              );
-              if (itemIdsToDelete.length > 0) {
-                await tx.productOptionItem.deleteMany({
-                  where: { id: { in: itemIdsToDelete } },
-                });
-              }
-
-              for (const item of productOptionItems) {
-                const { id: itemId, ...itemData } = item;
-                if (itemId) {
-                  await tx.productOptionItem.update({
-                    where: { id: itemId },
-                    data: itemData,
-                  });
-                } else {
-                  await tx.productOptionItem.create({
-                    data: { ...itemData, productOptionGroupId: groupId },
-                  });
-                }
-              }
-            }
-          } else {
-            await tx.productOptionGroup.create({
-              data: {
-                ...groupData,
-                productId: id,
-                productOptionItems: { create: productOptionItems },
-              },
+          const groupIdsToDelete = existingGroups
+            .map((g) => g.id)
+            .filter((gId) => !incomingGroupIds.includes(gId));
+          if (groupIdsToDelete.length > 0) {
+            await tx.productOptionGroup.deleteMany({
+              where: { id: { in: groupIdsToDelete } },
             });
           }
-        }
-      }
 
-      // 4. Smart Sync ProductAttributes & Values (nếu type = VARIANT)
-      if (newType === ProductType.VARIANT && productAttributes) {
-        const existingAttrs = currentProduct.productAttributes || [];
-        const incomingAttrIds = productAttributes
-          .map((a) => a.id)
-          .filter(Boolean);
-
-        const attrIdsToDelete = existingAttrs
-          .map((a) => a.id)
-          .filter((aId) => !incomingAttrIds.includes(aId));
-        if (attrIdsToDelete.length > 0) {
-          await tx.productAttribute.deleteMany({
-            where: { id: { in: attrIdsToDelete } },
-          });
-        }
-
-        for (const attr of productAttributes) {
-          const { id: attrId, values, ...attrData } = attr;
-          if (attrId) {
-            const existingAttr = existingAttrs.find((a) => a.id === attrId);
-            if (!existingAttr) {
-              throw new BadRequestException(
-                'Thuộc tính không tồn tại hoặc đã bị xoá',
+          for (const group of productOptionGroups) {
+            const { id: groupId, productOptionItems, ...groupData } = group;
+            if (groupId) {
+              const existingGroup = existingGroups.find(
+                (g) => g.id === groupId,
               );
-            }
-            await tx.productAttribute.update({
-              where: { id: attrId },
-              data: attrData,
-            });
-
-            if (values) {
-              const existingValueIds = existingAttr.productAttributeValues.map(
-                (v) => v.id,
-              );
-              const incomingValueIds = values.map((v) => v.id).filter(Boolean);
-
-              const valueIdsToDelete = existingValueIds.filter(
-                (vId) => !incomingValueIds.includes(vId),
-              );
-              if (valueIdsToDelete.length > 0) {
-                await tx.productAttributeValue.deleteMany({
-                  where: { id: { in: valueIdsToDelete } },
-                });
-              }
-
-              for (const val of values) {
-                const { id: valId, ...valData } = val;
-                if (valId) {
-                  await tx.productAttributeValue.update({
-                    where: { id: valId },
-                    data: valData,
-                  });
-                } else {
-                  await tx.productAttributeValue.create({
-                    data: { ...valData, productAttributeId: attrId },
-                  });
-                }
-              }
-            }
-          } else {
-            await tx.productAttribute.create({
-              data: {
-                ...attrData,
-                productId: id,
-                productAttributeValues: { create: values },
-              },
-            });
-          }
-        }
-      }
-
-      // 5. Smart Sync ProductVariants (nếu type = VARIANT)
-      if (newType === ProductType.VARIANT && normalizedUpdateVariants) {
-        const latestProduct = await tx.product.findUniqueOrThrow({
-          where: { id },
-          include: {
-            productAttributes: { include: { productAttributeValues: true } },
-            productVariants: true,
-          },
-        });
-
-        const valueMap = new Map<string, string>();
-        for (const attr of latestProduct.productAttributes) {
-          for (const val of attr.productAttributeValues) {
-            valueMap.set(`${attr.name}:${val.value}`, val.id);
-            valueMap.set(val.id, val.id);
-          }
-        }
-
-        const existingVariants = latestProduct.productVariants || [];
-        const incomingVariantIds = normalizedUpdateVariants
-          .map((v) => v.id)
-          .filter(Boolean);
-
-        const variantIdsToDelete = existingVariants
-          .map((v) => v.id)
-          .filter((vId) => !incomingVariantIds.includes(vId));
-        if (variantIdsToDelete.length > 0) {
-          await tx.productVariant.deleteMany({
-            where: { id: { in: variantIdsToDelete } },
-          });
-        }
-
-        for (const variantDto of normalizedUpdateVariants) {
-          const {
-            id: variantId,
-            sku: variantSku,
-            attributeSelections,
-            attributeValueIds,
-            compareAtPrice: vCompareAtPrice,
-            saleStartAt: vSaleStartAt,
-            saleEndAt: vSaleEndAt,
-            ...variantData
-          } = variantDto;
-
-          const targetValueIds: string[] = [];
-          if (attributeValueIds?.length) {
-            targetValueIds.push(...attributeValueIds);
-          } else if (attributeSelections?.length) {
-            for (const sel of attributeSelections) {
-              const valId = valueMap.get(`${sel.attributeName}:${sel.value}`);
-              if (!valId) {
+              if (!existingGroup) {
                 throw new BadRequestException(
-                  `Không tìm thấy giá trị thuộc tính '${sel.attributeName}: ${sel.value}'`,
+                  'Nhóm tuỳ chọn không tồn tại hoặc đã bị xoá',
                 );
               }
-              targetValueIds.push(valId);
+
+              // Invariant tính trên TRẠNG THÁI SAU UPDATE: field/items không gửi
+              // thì giữ nguyên giá trị hiện có.
+              assertOptionGroupValid(
+                groupData.minSelect !== undefined
+                  ? groupData.minSelect
+                  : existingGroup.minSelect,
+                groupData.maxSelect !== undefined
+                  ? groupData.maxSelect
+                  : existingGroup.maxSelect,
+                productOptionItems ?? existingGroup.productOptionItems,
+                `Nhóm tuỳ chọn '${groupData.name ?? existingGroup.name}'`,
+              );
+
+              await tx.productOptionGroup.update({
+                where: { id: groupId },
+                data: groupData,
+              });
+
+              if (productOptionItems) {
+                const existingItemIds = existingGroup.productOptionItems.map(
+                  (i) => i.id,
+                );
+                const incomingItemIds = productOptionItems
+                  .map((i) => i.id)
+                  .filter(Boolean);
+
+                const itemIdsToDelete = existingItemIds.filter(
+                  (iId) => !incomingItemIds.includes(iId),
+                );
+                if (itemIdsToDelete.length > 0) {
+                  await tx.productOptionItem.deleteMany({
+                    where: { id: { in: itemIdsToDelete } },
+                  });
+                }
+
+                for (const item of productOptionItems) {
+                  const { id: itemId, ...itemData } = item;
+                  if (itemId) {
+                    // Chặn sửa nhầm item của nhóm/sản phẩm khác: id gửi lên PHẢI
+                    // thuộc đúng nhóm này (giống check ownership của group ở trên).
+                    if (!existingItemIds.includes(itemId)) {
+                      throw new BadRequestException(
+                        'Tuỳ chọn không thuộc nhóm này hoặc đã bị xoá',
+                      );
+                    }
+                    await tx.productOptionItem.update({
+                      where: { id: itemId },
+                      data: itemData,
+                    });
+                  } else {
+                    await tx.productOptionItem.create({
+                      data: { ...itemData, productOptionGroupId: groupId },
+                    });
+                  }
+                }
+              }
+            } else {
+              assertOptionGroupValid(
+                groupData.minSelect,
+                groupData.maxSelect,
+                productOptionItems ?? [],
+                `Nhóm tuỳ chọn '${groupData.name}'`,
+              );
+
+              await tx.productOptionGroup.create({
+                data: {
+                  ...groupData,
+                  productId: id,
+                  productOptionItems: { create: productOptionItems },
+                },
+              });
+            }
+          }
+        }
+
+        // 4. Smart Sync ProductAttributes & Values (nếu type = VARIANT)
+        if (newType === ProductType.VARIANT && productAttributes) {
+          const existingAttrs = currentProduct.productAttributes || [];
+          const incomingAttrIds = productAttributes
+            .map((a) => a.id)
+            .filter(Boolean);
+
+          const attrIdsToDelete = existingAttrs
+            .map((a) => a.id)
+            .filter((aId) => !incomingAttrIds.includes(aId));
+          if (attrIdsToDelete.length > 0) {
+            await tx.productAttribute.deleteMany({
+              where: { id: { in: attrIdsToDelete } },
+            });
+          }
+
+          for (const attr of productAttributes) {
+            const { id: attrId, values, ...attrData } = attr;
+            if (attrId) {
+              const existingAttr = existingAttrs.find((a) => a.id === attrId);
+              if (!existingAttr) {
+                throw new BadRequestException(
+                  'Thuộc tính không tồn tại hoặc đã bị xoá',
+                );
+              }
+              await tx.productAttribute.update({
+                where: { id: attrId },
+                data: attrData,
+              });
+
+              if (values) {
+                const existingValueIds =
+                  existingAttr.productAttributeValues.map((v) => v.id);
+                const incomingValueIds = values
+                  .map((v) => v.id)
+                  .filter(Boolean);
+
+                const valueIdsToDelete = existingValueIds.filter(
+                  (vId) => !incomingValueIds.includes(vId),
+                );
+                if (valueIdsToDelete.length > 0) {
+                  await tx.productAttributeValue.deleteMany({
+                    where: { id: { in: valueIdsToDelete } },
+                  });
+                }
+
+                for (const val of values) {
+                  const { id: valId, ...valData } = val;
+                  if (valId) {
+                    await tx.productAttributeValue.update({
+                      where: { id: valId },
+                      data: valData,
+                    });
+                  } else {
+                    await tx.productAttributeValue.create({
+                      data: { ...valData, productAttributeId: attrId },
+                    });
+                  }
+                }
+              }
+            } else {
+              await tx.productAttribute.create({
+                data: {
+                  ...attrData,
+                  productId: id,
+                  productAttributeValues: { create: values },
+                },
+              });
+            }
+          }
+        }
+
+        // 5. Smart Sync ProductVariants (nếu type = VARIANT)
+        if (newType === ProductType.VARIANT && normalizedUpdateVariants) {
+          const latestProduct = await tx.product.findUniqueOrThrow({
+            where: { id },
+            include: {
+              productAttributes: { include: { productAttributeValues: true } },
+              productVariants: true,
+            },
+          });
+
+          const valueMap = new Map<string, string>();
+          for (const attr of latestProduct.productAttributes) {
+            for (const val of attr.productAttributeValues) {
+              valueMap.set(`${attr.name}:${val.value}`, val.id);
+              valueMap.set(val.id, val.id);
             }
           }
 
-          const parsedVariantPricing = {
+          const existingVariants = latestProduct.productVariants || [];
+          const incomingVariantIds = normalizedUpdateVariants
+            .map((v) => v.id)
+            .filter(Boolean);
+
+          const variantIdsToDelete = existingVariants
+            .map((v) => v.id)
+            .filter((vId) => !incomingVariantIds.includes(vId));
+          if (variantIdsToDelete.length > 0) {
+            await tx.productVariant.deleteMany({
+              where: { id: { in: variantIdsToDelete } },
+            });
+          }
+
+          for (const variantDto of normalizedUpdateVariants) {
+            const {
+              id: variantId,
+              sku: variantSku,
+              attributeSelections,
+              attributeValueIds,
+              compareAtPrice: vCompareAtPrice,
+              saleStartAt: vSaleStartAt,
+              saleEndAt: vSaleEndAt,
+              ...variantData
+            } = variantDto;
+
+            const targetValueIds: string[] = [];
+            if (attributeValueIds?.length) {
+              targetValueIds.push(...attributeValueIds);
+            } else if (attributeSelections?.length) {
+              for (const sel of attributeSelections) {
+                const valId = valueMap.get(`${sel.attributeName}:${sel.value}`);
+                if (!valId) {
+                  throw new BadRequestException(
+                    `Không tìm thấy giá trị thuộc tính '${sel.attributeName}: ${sel.value}'`,
+                  );
+                }
+                targetValueIds.push(valId);
+              }
+            }
+
+            const parsedVariantPricing = {
+              compareAtPrice:
+                vCompareAtPrice !== undefined
+                  ? (vCompareAtPrice ?? null)
+                  : undefined,
+              saleStartAt:
+                vSaleStartAt !== undefined
+                  ? vSaleStartAt
+                    ? new Date(vSaleStartAt)
+                    : null
+                  : undefined,
+              saleEndAt:
+                vSaleEndAt !== undefined
+                  ? vSaleEndAt
+                    ? new Date(vSaleEndAt)
+                    : null
+                  : undefined,
+            };
+
+            if (variantId) {
+              // Update variant cũ: SKU là READ-ONLY, giữ nguyên SKU cũ không cho sửa!
+              await tx.productVariant.update({
+                where: { id: variantId },
+                data: {
+                  ...variantData, // không chứa SKU
+                  ...parsedVariantPricing,
+                  productVariantAttributeValues: {
+                    deleteMany: {},
+                    create: targetValueIds.map((valId) => ({
+                      productAttributeValueId: valId,
+                    })),
+                  },
+                },
+              });
+            } else {
+              // Create variant mới: Dùng SKU được truyền hoặc SKU đã tự sinh
+              const existingSku = await tx.productVariant.findFirst({
+                where: { sku: variantSku },
+              });
+              if (existingSku) {
+                throw new BadRequestException(
+                  `Mã SKU biến thể '${variantSku}' đã tồn tại trong hệ thống`,
+                );
+              }
+
+              await tx.productVariant.create({
+                data: {
+                  ...variantData,
+                  sku: variantSku!,
+                  compareAtPrice: vCompareAtPrice ?? null,
+                  saleStartAt: vSaleStartAt ? new Date(vSaleStartAt) : null,
+                  saleEndAt: vSaleEndAt ? new Date(vSaleEndAt) : null,
+                  productId: id,
+                  productVariantAttributeValues: {
+                    create: targetValueIds.map((valId) => ({
+                      productAttributeValueId: valId,
+                    })),
+                  },
+                },
+              });
+            }
+          }
+        }
+
+        // 6. Update main product info
+        await tx.product.update({
+          where: { id },
+          data: {
+            ...productData,
+            type: newType,
             compareAtPrice:
-              vCompareAtPrice !== undefined
-                ? (vCompareAtPrice ?? null)
+              compareAtPrice !== undefined
+                ? (compareAtPrice ?? null)
                 : undefined,
             saleStartAt:
-              vSaleStartAt !== undefined
-                ? vSaleStartAt
-                  ? new Date(vSaleStartAt)
+              saleStartAt !== undefined
+                ? saleStartAt
+                  ? new Date(saleStartAt)
                   : null
                 : undefined,
             saleEndAt:
-              vSaleEndAt !== undefined
-                ? vSaleEndAt
-                  ? new Date(vSaleEndAt)
+              saleEndAt !== undefined
+                ? saleEndAt
+                  ? new Date(saleEndAt)
                   : null
                 : undefined,
-          };
-
-          if (variantId) {
-            // Update variant cũ: SKU là READ-ONLY, giữ nguyên SKU cũ không cho sửa!
-            await tx.productVariant.update({
-              where: { id: variantId },
-              data: {
-                ...variantData, // không chứa SKU
-                ...parsedVariantPricing,
-                productVariantAttributeValues: {
+            ...(slug && { slug }),
+            productLabels: labelIds
+              ? {
                   deleteMany: {},
-                  create: targetValueIds.map((valId) => ({
-                    productAttributeValueId: valId,
-                  })),
-                },
-              },
-            });
-          } else {
-            // Create variant mới: Dùng SKU được truyền hoặc SKU đã tự sinh
-            const existingSku = await tx.productVariant.findFirst({
-              where: { sku: variantSku },
-            });
-            if (existingSku) {
-              throw new BadRequestException(
-                `Mã SKU biến thể '${variantSku}' đã tồn tại trong hệ thống`,
-              );
-            }
-
-            await tx.productVariant.create({
-              data: {
-                ...variantData,
-                sku: variantSku!,
-                compareAtPrice: vCompareAtPrice ?? null,
-                saleStartAt: vSaleStartAt ? new Date(vSaleStartAt) : null,
-                saleEndAt: vSaleEndAt ? new Date(vSaleEndAt) : null,
-                productId: id,
-                productVariantAttributeValues: {
-                  create: targetValueIds.map((valId) => ({
-                    productAttributeValueId: valId,
-                  })),
-                },
-              },
-            });
-          }
-        }
-      }
-
-      // 6. Update main product info
-      await tx.product.update({
-        where: { id },
-        data: {
-          ...productData,
-          type: newType,
-          compareAtPrice:
-            compareAtPrice !== undefined ? (compareAtPrice ?? null) : undefined,
-          saleStartAt:
-            saleStartAt !== undefined
-              ? saleStartAt
-                ? new Date(saleStartAt)
-                : null
+                  create: labelIds.map((labelId) => ({ labelId })),
+                }
               : undefined,
-          saleEndAt:
-            saleEndAt !== undefined
-              ? saleEndAt
-                ? new Date(saleEndAt)
-                : null
-              : undefined,
-          ...(slug && { slug }),
-          productLabels: labelIds
-            ? {
-                deleteMany: {},
-                create: labelIds.map((labelId) => ({ labelId })),
-              }
-            : undefined,
-        },
-      });
-    });
+          },
+        });
+        // Transaction interactive của Prisma mặc định timeout 5s — luồng sync bên
+        // trên chạy nhiều query tuần tự (mỗi variant/attribute/item vài query),
+        // sản phẩm nhiều biến thể dễ chạm ngưỡng → P2028 rollback sạch.
+      },
+      { timeout: 15_000 },
+    );
 
     const updatedProduct = await this.prismaService.product.findUniqueOrThrow({
       where: { id },
@@ -760,16 +809,36 @@ export class ProductService {
 
   async delete(id: string): Promise<ProductResponseDto> {
     const currentProduct = await this.findOne(id);
+    const deletedAt = new Date();
+    const suffix = `deleted-${deletedAt.getTime()}`;
 
-    const deletedProduct = await this.prismaService.product.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        deletedAt: new Date(),
-        slug: `deleted-${currentProduct.slug}-${Date.now()}`,
-      },
-      include: defaultInclude,
+    // `slug` và `sku` đều @unique — soft delete phải GIẢI PHÓNG cả hai, không thì
+    // bản ghi "đã xoá" (người dùng không còn thấy) vẫn chiếm chỗ và chặn việc
+    // tạo lại sản phẩm cùng slug/SKU. Variant cũng có sku @unique → xử lý luôn.
+    const deletedProduct = await this.prismaService.$transaction(async (tx) => {
+      for (const variant of currentProduct.productVariants ?? []) {
+        await tx.productVariant.update({
+          where: { id: variant.id },
+          data: {
+            isDeleted: true,
+            deletedAt,
+            sku: `${suffix}-${variant.sku}`,
+          },
+        });
+      }
+
+      return tx.product.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt,
+          slug: `${suffix}-${currentProduct.slug}`,
+          sku: `${suffix}-${currentProduct.sku}`,
+        },
+        include: defaultInclude,
+      });
     });
+
     return this.toResponse(deletedProduct);
   }
 
@@ -911,7 +980,6 @@ export class ProductService {
         return {
           ...variant,
           ...vPricing,
-          stock: variant.stock,
           imageUrl: variant.imageUrl,
           status: variant.status,
           attributeValues: variant.productVariantAttributeValues?.map(

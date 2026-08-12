@@ -21,6 +21,7 @@ type PrismaBrandMock = {
     findUnique: jest.Mock;
     count: jest.Mock;
     update: jest.Mock;
+    delete: jest.Mock;
   };
 };
 
@@ -31,6 +32,7 @@ const createPrismaMock = (): PrismaBrandMock => ({
     findUnique: jest.fn(),
     count: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   },
 });
 
@@ -40,8 +42,6 @@ const brandFixture = {
   name: 'Omial',
   logo: 'https://cdn.omial.dev/brands/omial.png',
   description: 'Thương hiệu nội thất cao cấp.',
-  isDeleted: false,
-  deletedAt: null,
   createdAt: new Date('2026-07-29T00:00:00.000Z'),
   updatedAt: new Date('2026-07-29T00:00:00.000Z'),
 };
@@ -96,13 +96,13 @@ describe('BrandService', () => {
       const result = await service.findAll(query);
 
       expect(prisma.brand.findMany).toHaveBeenCalledWith({
-        where: { isDeleted: false },
+        where: {},
         skip: 0,
         take: 10,
         orderBy: { createdAt: 'desc' },
       });
       expect(prisma.brand.count).toHaveBeenCalledWith({
-        where: { isDeleted: false },
+        where: {},
       });
       expect(result).toEqual({
         items: [brandFixture],
@@ -127,7 +127,6 @@ describe('BrandService', () => {
       expect(prisma.brand.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            isDeleted: false,
             name: { contains: 'omi', mode: 'insensitive' },
           },
         }),
@@ -164,12 +163,12 @@ describe('BrandService', () => {
       const result = await service.findOne(brandFixture.id);
 
       expect(prisma.brand.findUnique).toHaveBeenCalledWith({
-        where: { id: brandFixture.id, isDeleted: false },
+        where: { id: brandFixture.id },
       });
       expect(result).toBe(brandFixture);
     });
 
-    it('throw NotFoundException khi id không tồn tại hoặc đã soft-delete', async () => {
+    it('throw NotFoundException khi id không tồn tại', async () => {
       prisma.brand.findUnique.mockResolvedValue(null);
 
       // .rejects.toThrow là cách assert 1 Promise reject với error cụ thể.
@@ -192,7 +191,7 @@ describe('BrandService', () => {
         name: 'Omial 2',
       });
 
-      const result = await service.update(brandFixture.id, dto);
+      const result = await service.update(dto);
 
       // Thứ tự gọi quan trọng: findUnique phải chạy TRƯỚC update.
       const findOrder = prisma.brand.findUnique.mock.invocationCallOrder[0];
@@ -210,7 +209,7 @@ describe('BrandService', () => {
       prisma.brand.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.update('missing-id', { id: 'missing-id', name: 'X' }),
+        service.update({ id: 'missing-id', name: 'X' }),
       ).rejects.toThrow(NotFoundException);
 
       // Assert âm — chứng minh guard clause chặn được side-effect.
@@ -220,24 +219,16 @@ describe('BrandService', () => {
 
   // ─── delete ──────────────────────────────────────────────────────────────
   describe('delete', () => {
-    it('soft-delete: set isDeleted=true và deletedAt', async () => {
+    // Brand dùng HARD delete (xem docs/patterns/soft-delete.md): không ai tham
+    // chiếu lịch sử tới brand, `Product.brandId` onDelete SetNull tự gỡ liên kết.
+    it('hard-delete: gọi prisma.delete sau khi kiểm tra tồn tại', async () => {
       prisma.brand.findUnique.mockResolvedValue(brandFixture);
-      prisma.brand.update.mockResolvedValue({
-        ...brandFixture,
-        isDeleted: true,
-        deletedAt: new Date(),
-      });
+      prisma.brand.delete.mockResolvedValue(brandFixture);
 
       await service.delete(brandFixture.id);
 
-      expect(prisma.brand.update).toHaveBeenCalledWith({
+      expect(prisma.brand.delete).toHaveBeenCalledWith({
         where: { id: brandFixture.id },
-        data: {
-          isDeleted: true,
-          // deletedAt là Date "vừa mới" — dùng matcher expect.any(Date) để
-          // không phụ thuộc vào giá trị chính xác của thời điểm test.
-          deletedAt: expect.any(Date),
-        },
       });
     });
 

@@ -13,11 +13,13 @@
     "start:gateway": "nest start api-gateway --watch",
     "start:auth": "nest start auth-service --watch",
     "start:product": "nest start product-service --watch",
+    "start:inventory": "nest start inventory-service --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/apps/omial-market-backend/main",
     "db:migrate:auth": "cd apps/auth-service && prisma migrate deploy",
     "db:push:auth": "cd apps/auth-service && prisma db push",
     "db:push:product": "cd apps/product-service && prisma db push",
+    "db:migrate:inventory": "cd apps/inventory-service && prisma migrate deploy",
 
     "db:seed": "ts-node -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' apps/auth-service/prisma/seed.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
