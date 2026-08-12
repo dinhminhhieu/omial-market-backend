@@ -27,9 +27,12 @@ export class ProductOptionGroupResponseDto {
   @ApiProperty({
     type: () => [ProductOptionItemResponseDto],
     required: false,
-    description: 'Chỉ có khi query include items',
+    description: 'Chỉ có khi query include productOptionItems',
   })
-  items?: ProductOptionItemResponseDto[];
+  // Tên field khớp với wire format thật của product-service (toResponse spread
+  // quan hệ Prisma `productOptionItems`) — trước đây khai `items` là NÓI DỐI:
+  // TS cho order-service đọc `.items` nhưng runtime là undefined.
+  productOptionItems?: ProductOptionItemResponseDto[];
 
   @ApiProperty({ example: '2026-08-03T10:37:26.521Z' })
   createdAt: Date;

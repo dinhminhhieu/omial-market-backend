@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderServiceController } from './order-service.controller';
 import { OrderServiceService } from './order-service.service';
+import { PrismaService } from './prisma/prisma.service';
+import { INVENTORY_CLIENT, PRODUCT_CLIENT } from './clients';
 
 describe('OrderServiceController', () => {
   let orderServiceController: OrderServiceController;
@@ -8,15 +10,20 @@ describe('OrderServiceController', () => {
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [OrderServiceController],
-      providers: [OrderServiceService],
+      providers: [
+        OrderServiceService,
+        { provide: PrismaService, useValue: {} },
+        { provide: PRODUCT_CLIENT, useValue: {} },
+        { provide: INVENTORY_CLIENT, useValue: {} },
+      ],
     }).compile();
 
-    orderServiceController = app.get<OrderServiceController>(OrderServiceController);
+    orderServiceController = app.get<OrderServiceController>(
+      OrderServiceController,
+    );
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(orderServiceController.getHello()).toBe('Hello World!');
-    });
+  it('should be defined', () => {
+    expect(orderServiceController).toBeDefined();
   });
 });

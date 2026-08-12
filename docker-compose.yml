@@ -23,17 +23,17 @@ services:
     volumes:
       - postgres_product_data:/var/lib/postgresql/data
 
-  # postgres-order:
-  #   image: postgres:16
-  #   container_name: postgres-order
-  #   environment:
-  #     POSTGRES_DB: omial_order_db
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #   ports:
-  #     - "5435:5432"
-  #   volumes:
-  #     - postgres_order_data:/var/lib/postgresql/data
+  postgres-order:
+    image: postgres:16
+    container_name: postgres-order
+    environment:
+      POSTGRES_DB: omial_order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_order_data:/var/lib/postgresql/data
 
   postgres-inventory:
     image: postgres:16
