@@ -362,6 +362,32 @@ Chọn **Orchestration** (dễ debug hơn Choreography):
 - [ ] Compensate khi fail: `cancelOrder`, `releaseInventory`, `refundPayment`.
 - [ ] Test: mock payment fail → verify inventory được release + order status = CANCELLED.
 
+### 7.7. Audit log qua domain events (ứng dụng đẹp nhất của event-driven)
+
+**Phân biệt trước** (dễ nhầm): **system log** (pino 5.4, observability Phase 4) = log
+kỹ thuật cho dev, xoay vòng xoá; **audit log** = nhật ký NGHIỆP VỤ "ai làm gì với cái
+gì lúc nào" — người đọc là chủ shop/kế toán, append-only, giữ nhiều năm, nằm trong DB.
+Repo đã có 2 audit log chuyên ngành mà không gọi tên: `StockMovement` + `PromotionUsage`
+(sổ cái = audit log của domain đó). Mục này làm audit TỔNG QUÁT cho hành động quản trị
+(sửa giá, xoá danh mục, đổi trạng thái đơn...).
+
+**Điều kiện tiên quyết**: envelope RMQ phải mang `userId` (có sau Phase 1 — JWT verify
+ở gateway). Audit không có cột `actor` = vô dụng.
+
+Cách làm — tái dùng nguyên bộ đồ nghề 7.1→7.5, không học thêm pattern mới:
+
+- [ ] Mỗi service emit domain event khi WRITE: `product.updated { actor, entityId, before, after, eventId }` (outbox 7.3 đảm bảo không mất).
+- [ ] Audit consumer (nhét chung notification-service hoặc audit-service riêng) hứng
+  mọi `*.created/updated/deleted` → ghi bảng `AuditLog(actor, action, entity, entityId, before, after, createdAt)` — append-only như StockMovement.
+- [ ] Idempotent theo `eventId` (7.4) — audit ghi trùng là sai sự thật.
+- [ ] Endpoint tra cứu: `GET /audit?entity=product&entityId=...` (phân trang).
+- [ ] **KHÔNG audit GET** — chỉ audit theo RỦI RO: mọi write + auth events (login
+  fail/success, đổi quyền) + read nhạy cảm nếu có (export dữ liệu). Lượt xem sản phẩm
+  là việc của analytics (hệ khác), không phải audit.
+- [ ] Chống phình: `before/after` chỉ ghi DIFF (`{price: [cũ, mới]}`), partition bảng
+  theo tháng + retention (archive sang cold storage sau 1–2 năm).
+- [ ] Note `docs/patterns/audit-log.md`: vì sao audit qua event chứ không phải interceptor per-service (không chặn request chính, không quên khi thêm service mới, tập trung 1 chỗ để đối soát) + tiêu chí audit-theo-rủi-ro ở trên.
+
 ### Tiêu chí thành công Phase 2
 
 - Register user → response < 100ms, email vẫn được gửi (chậm hơn vài giây).
@@ -369,6 +395,7 @@ Chọn **Orchestration** (dễ debug hơn Choreography):
 - Publish event 10 lần → user chỉ nhận 1 email (Idempotency).
 - SMTP down → event vào DLQ sau 3 lần, có endpoint replay.
 - Payment fail giữa saga → hoàn toàn rollback (order cancel, inventory release).
+- Sửa giá 1 sản phẩm → `GET /audit?entity=product&entityId=...` thấy dòng ai-sửa-gì-lúc-nào (before/after).
 - Đã viết note cho **7 pattern**: pub/sub, event-driven, outbox, idempotency, DLQ, saga-orchestration, choreography-vs-orchestration.
 
 ---
@@ -591,6 +618,13 @@ có **app POS native** (nhu cầu lệch hẳn: aggregation màn bán hàng, off
 - [ ] Cài Unleash hoặc tự viết mini.
 - [ ] Toggle feature runtime không cần redeploy.
 - [ ] A/B testing framework.
+
+### 11.7. Multi-tenancy (Pool model) — CHỈ khi build SaaS thật
+
+Hướng đã chốt sẵn trong [ADR-001](../docs/adr/001-multi-tenancy-pool-model.md)
+(pool model: chung schema + cột `tenantId`, composite unique, index dẫn đầu
+tenantId, JWT mang tenantId, envelope RMQ, auto-inject filter). Repo học
+**không triển khai** — đọc ADR khi cần là đủ.
 
 ---
 

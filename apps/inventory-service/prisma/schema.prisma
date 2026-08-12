@@ -1,13 +1,72 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
 }
 
 datasource db {
   provider = "postgresql"
 }
+
+// Đơn vị lưu kho tham chiếu tới cái gì bên product-service.
+// Option item KHÔNG có tồn kho — tồn kho chỉ gắn với SKU (product/variant).
+enum StockRefType {
+  PRODUCT // Product type SIMPLE / OPTION — tồn theo sản phẩm
+  VARIANT // Product type VARIANT — tồn theo từng biến thể
+}
+
+enum StockMovementType {
+  RECEIVE // phiếu nhập kho (delta +)
+  ISSUE // phiếu XUẤT kho thủ công: hủy/hỏng, dùng nội bộ, trả NCC (delta -). Chỉ xuất được trong phạm vi available (onHand - reserved)
+  ADJUST // phiếu kiểm kê / điều chỉnh (delta +/-) — cho lệch KHÔNG rõ nguyên nhân; sự kiện có chủ đích thì dùng ISSUE/RECEIVE
+  SALE // xuất bán — sinh tự động từ đơn hàng (Phase 2 saga), KHÔNG lập tay
+  RETURN // hoàn hàng về kho (Phase 2)
+}
+
+// 1 dòng = tồn kho HIỆN TẠI của 1 đơn vị lưu kho.
+// - onHand   : số đang nằm trong kho vật lý (khớp khi kiểm kê)
+// - reserved : số đã bị đơn hàng giữ chỗ (Phase 2 saga mới ghi, để sẵn cột)
+// - available = onHand - reserved → DERIVED, không lưu — đây mới là số cho khách xem.
+// Bất biến sổ cái: onHand == SUM(movements.delta) — cột này chỉ là cache để đọc
+// nhanh, sự thật nằm ở StockMovement. Không có API nào set thẳng onHand.
+model StockItem {
+  id       String       @id @default(uuid())
+  refType  StockRefType
+  refId    String // id Product/Variant bên product-service — string thường, KHÔNG FK (khác DB)
+  sku      String       @unique // copy sang để tra cứu/hiển thị (không join chéo service được)
+  onHand   Int          @default(0)
+  reserved Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements StockMovement[]
+
+  // Chống trùng + làm mốc upsert idempotent. Không dùng 2 cột productId/variantId
+  // nullable vì Postgres coi NULL != NULL trong unique → cho phép trùng.
+  @@unique([refType, refId])
+}
+
+// Sổ cái APPEND-ONLY: chỉ INSERT, không bao giờ UPDATE/DELETE.
+// Ghi sai → ghi thêm 1 dòng ADJUST bù (như kế toán bút toán đảo).
+// Vì vậy model này KHÔNG có updatedAt / isDeleted.
+model StockMovement {
+  id          String            @id @default(uuid())
+  stockItemId String
+  stockItem   StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  type        StockMovementType
+  delta       Int // có dấu: +5 nhập, -3 xuất. SUM(delta) == stockItem.onHand
+  reason      String? // "nhập lô 10/8", "kiểm kê lệch", "vỡ 2 thùng"…
+  refType     String? // nguồn gốc chứng từ: 'order'… (Phase 2)
+  refId       String? // orderId khi type = SALE/RETURN (Phase 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([stockItemId, createdAt])
+}
+
+// Phase 2 (saga đặt hàng) sẽ thêm bảng StockReservation:
+//   (stockItemId, orderId @unique, quantity, expiresAt) — giữ chỗ có hạn,
+//   orderId unique = idempotency chống reserve trùng. Thêm bảng mới là
+//   migration cộng thêm nên không cần dựng trước.

@@ -11,7 +11,11 @@ export class ProductOptionGroupResponseDto {
   @ApiProperty({ example: 1, description: '0 = không bắt buộc chọn' })
   minSelect: number;
 
-  @ApiProperty({ example: 1, nullable: true, description: 'null = không giới hạn' })
+  @ApiProperty({
+    example: 1,
+    nullable: true,
+    description: 'null = không giới hạn',
+  })
   maxSelect: number | null;
 
   @ApiProperty({ example: 0 })

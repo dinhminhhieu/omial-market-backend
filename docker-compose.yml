@@ -35,17 +35,29 @@ services:
   #   volumes:
   #     - postgres_order_data:/var/lib/postgresql/data
 
-  # postgres-inventory:
+  postgres-inventory:
+    image: postgres:16
+    container_name: postgres-inventory
+    environment:
+      POSTGRES_DB: omial_inventory_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_inventory_data:/var/lib/postgresql/data
+
+  # postgres-promotion:
   #   image: postgres:16
-  #   container_name: postgres-inventory
+  #   container_name: postgres-promotion
   #   environment:
-  #     POSTGRES_DB: omial_inventory_db
+  #     POSTGRES_DB: omial_promotion_db
   #     POSTGRES_USER: postgres
   #     POSTGRES_PASSWORD: postgres
   #   ports:
-  #     - "5436:5432"
+  #     - "5437:5432"
   #   volumes:
-  #     - postgres_inventory_data:/var/lib/postgresql/data
+  #     - postgres_promotion_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
@@ -65,3 +77,4 @@ volumes:
   postgres_product_data:
   postgres_order_data:
   postgres_inventory_data:
+  postgres_promotion_data:

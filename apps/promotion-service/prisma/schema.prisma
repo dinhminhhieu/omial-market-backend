@@ -1,0 +1,202 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// PROMOTION — campaign khuyến mãi. Một promotion = 5 trục độc lập:
+//   1. LỢI ÍCH  (benefitType + discountValue / gifts)      — giảm gì / tặng gì
+//   2. PHẠM VI  (appliesTo + PromotionTarget)              — áp lên cái gì
+//   3. ĐIỀU KIỆN (minOrderAmount, minQuantity, firstOrder) — khi nào đủ điều kiện
+//   4. GIỚI HẠN (maxTotalUses, maxUsesPerCustomer, codes)  — ai/bao nhiêu lượt
+//   5. LỊCH     (startAt/endAt + PromotionTimeWindow)      — lúc nào chạy
+// Mọi id trỏ sang service khác (product, category, customer, order) đều là
+// STRING THƯỜNG, KHÔNG FK — khác DB (bài học giống inventory).
+// ============================================================================
+
+// Vòng đời campaign — dùng status, KHÔNG dùng boolean + KHÔNG hard delete khi
+// đã có lượt dùng (PromotionUsage tham chiếu lịch sử): "xoá" = ARCHIVED.
+enum PromotionStatus {
+  DRAFT // đang soạn, chưa chạy
+  ACTIVE // đang chạy (trong khung thời gian)
+  PAUSED // tạm dừng tay giữa chừng
+  ENDED // hết hạn / hết lượt
+  ARCHIVED // "đã xoá" — ẩn khỏi mọi danh sách, giữ lại vì usage tham chiếu
+}
+
+// Trục 1 — LỢI ÍCH: giảm giá hay quà tặng (yêu cầu số 1 của bạn)
+enum PromotionBenefitType {
+  PERCENTAGE // giảm % (discountValue = 0–100, nên kèm maxDiscountAmount)
+  FIXED_AMOUNT // giảm thẳng số tiền (discountValue = VNĐ)
+  FREE_SHIPPING // miễn phí vận chuyển (appliesTo phải là ORDER)
+  GIFT // quà tặng — danh sách ở PromotionGift, discountValue = null
+}
+
+// Trục 2 — PHẠM VI: giảm trên tổng đơn hay trên sản phẩm/danh mục cụ thể
+enum PromotionAppliesTo {
+  ORDER // tính trên tổng giá trị đơn
+  PRODUCT // chỉ tính trên các sản phẩm/biến thể trong PromotionTarget
+  CATEGORY // chỉ tính trên sản phẩm thuộc danh mục trong PromotionTarget
+}
+
+// Công khai hay riêng tư (yêu cầu số 2). Ma trận với PromotionCode:
+//   PUBLIC  + không code → tự động áp cho mọi khách đủ điều kiện
+//   PUBLIC  + có code    → mã công khai, ai nhập cũng được
+//   PRIVATE + whitelist  → chỉ khách trong PromotionCustomer thấy & dùng
+//   PRIVATE + có code    → mã kín, ai cầm mã (và trong whitelist nếu có) mới dùng
+enum PromotionVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+model Promotion {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  status      PromotionStatus     @default(DRAFT)
+  visibility  PromotionVisibility @default(PUBLIC)
+
+  // ----- Trục 1: lợi ích -----
+  benefitType       PromotionBenefitType
+  discountValue     Decimal?             @db.Decimal(12, 2) // % (0–100) hoặc VNĐ tuỳ benefitType; GIFT/FREE_SHIPPING = null
+  maxDiscountAmount Decimal?             @db.Decimal(12, 2) // trần giảm cho PERCENTAGE ("giảm 10% tối đa 50k")
+
+  // ----- Trục 2: phạm vi -----
+  appliesTo PromotionAppliesTo @default(ORDER) // != ORDER thì PHẢI có >=1 PromotionTarget
+
+  // ----- Trục 3: điều kiện (yêu cầu số 4 + 5) -----
+  minOrderAmount Decimal? @db.Decimal(12, 2) // tổng đơn tối thiểu
+  minQuantity    Int? // số lượng item tối thiểu TRONG PHẠM VI appliesTo ("mua 2 tặng 1" = minQuantity 2 + GIFT)
+  firstOrderOnly Boolean  @default(false) // chỉ khách mua lần đầu — caller truyền cờ isFirstOrder trong context evaluate
+
+  // ----- Trục 4: giới hạn lượt (yêu cầu số 3) -----
+  maxTotalUses       Int? // toàn chương trình; null = không giới hạn
+  maxUsesPerCustomer Int? // mỗi khách N lần; null = không giới hạn
+  usedCount          Int  @default(0) // CACHE — sự thật là COUNT(PromotionUsage); tăng bằng conditional UPDATE chống race (như reserve kho)
+
+  // ----- Trục 5: lịch -----
+  startAt DateTime
+  endAt   DateTime? // null = chạy tới khi tắt tay
+  // Khung giờ lặp lại (thứ 2, 7h–10h…) ở PromotionTimeWindow — không có dòng nào = mọi lúc trong [startAt, endAt]
+
+  // ----- Kết hợp nhiều khuyến mãi -----
+  isStackable Boolean @default(false) // false: không cộng dồn — nhiều promo cùng đậu thì chọn cái LỢI NHẤT cho khách (best-wins, chuẩn Shopify)
+  priority    Int     @default(0) // tie-break khi best-wins hoà; desc như quy ước repo
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  codes       PromotionCode[]
+  timeWindows PromotionTimeWindow[]
+  targets     PromotionTarget[]
+  gifts       PromotionGift[]
+  customers   PromotionCustomer[]
+  usages      PromotionUsage[]
+
+  @@index([status, startAt, endAt])
+  @@index([status, priority])
+}
+
+// Mã giảm giá — 1 campaign có 0..n mã (mã KOL riêng, lô mã dùng-1-lần…).
+// Campaign không có code = khuyến mãi TỰ ĐỘNG ÁP (automatic discount).
+model PromotionCode {
+  id          String    @id @default(uuid())
+  code        String    @unique // luôn lưu UPPERCASE, service normalize khi nhập
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  maxUses     Int? // giới hạn riêng của MÃ này (đè trong phạm vi mã; null = theo campaign)
+  usedCount   Int       @default(0)
+  status      Boolean   @default(true) // tắt riêng 1 mã mà không đụng campaign
+
+  createdAt DateTime @default(now())
+
+  usages PromotionUsage[]
+
+  @@index([promotionId])
+}
+
+// Khung giờ lặp lại — "thứ 2, 7h–10h" (yêu cầu thời gian nâng cao).
+// Nhiều dòng = OR (đậu 1 khung là đậu). Đánh giá theo GIỜ ĐỊA PHƯƠNG của shop
+// (Asia/Ho_Chi_Minh) — bẫy kinh điển: convert UTC trước khi so là sai ngày/giờ.
+model PromotionTimeWindow {
+  id          String    @id @default(uuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  daysOfWeek  Int[] // ISO: 1=Thứ Hai … 7=Chủ Nhật; mảng RỖNG = mọi ngày
+  startMinute Int // phút tính từ 00:00 — 420 = 07:00 (Int dễ so sánh, không mơ hồ như string)
+  endMinute   Int // 600 = 10:00; service gác startMinute < endMinute
+
+  @@index([promotionId])
+}
+
+enum PromotionTargetRefType {
+  PRODUCT
+  VARIANT
+  CATEGORY
+}
+
+// Phạm vi áp dụng khi appliesTo != ORDER — trỏ sang product-service bằng id thường.
+model PromotionTarget {
+  id          String                 @id @default(uuid())
+  promotionId String
+  promotion   Promotion              @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  refType     PromotionTargetRefType
+  refId       String // productId / variantId / categoryId bên product-service
+
+  @@unique([promotionId, refType, refId])
+}
+
+enum PromotionGiftRefType {
+  PRODUCT
+  VARIANT
+}
+
+// Quà tặng khi benefitType = GIFT. Evaluate trả về danh sách quà để FE hiển thị;
+// ĐƠN HÀNG snapshot tên/giá quà lúc chốt (promotion sửa sau không đổi lịch sử).
+model PromotionGift {
+  id          String               @id @default(uuid())
+  promotionId String
+  promotion   Promotion            @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  refType     PromotionGiftRefType
+  refId       String // productId / variantId bên product-service
+  quantity    Int                  @default(1)
+
+  @@unique([promotionId, refType, refId])
+}
+
+// Whitelist khách khi visibility = PRIVATE (yêu cầu "chọn khách cụ thể").
+model PromotionCustomer {
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  customerId  String // userId bên auth-service — string thường, không FK
+
+  createdAt DateTime @default(now())
+
+  @@id([promotionId, customerId])
+}
+
+// SỔ CÁI lượt dùng — append-only (mô hình quen thuộc: StockMovement lần 2).
+// Sự thật của usedCount nằm ở đây; không bao giờ UPDATE/DELETE dòng đã ghi.
+model PromotionUsage {
+  id              String         @id @default(uuid())
+  promotionId     String
+  promotion       Promotion      @relation(fields: [promotionId], references: [id], onDelete: Restrict) // ledger — cấm cascade mất lịch sử
+  promotionCodeId String?
+  promotionCode   PromotionCode? @relation(fields: [promotionCodeId], references: [id], onDelete: Restrict)
+  customerId      String? // null = khách vãng lai (guest) — maxUsesPerCustomer không enforce được cho guest
+  orderId         String // bên order-service
+  discountAmount  Decimal        @db.Decimal(12, 2) // SNAPSHOT số tiền đã giảm thực tế của đơn này
+
+  createdAt DateTime @default(now())
+
+  // Idempotency: order retry/duplicate message không đếm lượt 2 lần
+  @@unique([promotionId, orderId])
+  // Đếm "khách này dùng mấy lần" cho maxUsesPerCustomer
+  @@index([promotionId, customerId])
+}

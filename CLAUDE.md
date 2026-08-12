@@ -32,6 +32,9 @@ NestJS 11 · pnpm monorepo · RabbitMQ (`@nestjs/microservices` Transport.RMQ) �
 
 ## 📁 Specs chi tiết (đọc file tương ứng khi động vào phần đó)
 - [.claude/specs/auth-service.md](.claude/specs/auth-service.md) — auth-service (login, register+OTP, refresh, quên mật khẩu)
+- [.claude/specs/product-service.md](.claude/specs/product-service.md) — product-service (brand, label, category, option-template, product + option/variant)
+- [.claude/specs/inventory-service.md](.claude/specs/inventory-service.md) — inventory-service (tồn kho sổ cái: StockItem + StockMovement)
+- [.claude/specs/promotion-service.md](.claude/specs/promotion-service.md) — promotion-service (📐 mới thiết kế schema, chưa code)
 - [.claude/specs/api-gateway.md](.claude/specs/api-gateway.md) — gateway + client RMQ
 - [.claude/specs/shared-libs.md](.claude/specs/shared-libs.md) — libs/shared + libs/event-contracts
 - [.claude/specs/README.md](.claude/specs/README.md) — quy ước viết spec
@@ -54,6 +57,9 @@ User demo: `demo@omial.dev` / `password123`.
 ## Trạng thái migrate
 | Service | Trạng thái |
 | --- | --- |
-| api-gateway | ✅ HTTP + client RMQ tới auth (đủ 8 route auth) |
+| api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (4 route) |
 | auth-service | ✅ pure microservice — **login, register+OTP, verify/resend, quên/reset mật khẩu, refresh (rotation), logout** (OTP + refresh token lưu Redis) |
-| product / order / inventory | ⬜ chưa migrate (còn REST scaffolding) |
+| product-service | ✅ pure microservice — **brand, label, category (cây), option-template, product (SIMPLE/OPTION/VARIANT)**. Variant **không còn cột stock** (tồn kho → inventory). Còn thiếu unit test nghiệp vụ |
+| inventory-service | ✅ pure microservice — **sổ cái tồn kho: get_stock (batch), receive, issue (conditional update), adjust (optimistic lock), get_movements** — gateway route + smoke e2e pass. Còn thiếu unit test nghiệp vụ |
+| order | ⬜ chưa migrate (còn REST scaffolding) |
+| promotion | 📐 chỉ mới thiết kế schema (campaign 5 trục + sổ cái usage) — code sau khi xong Phase 0 |

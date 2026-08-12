@@ -3,7 +3,7 @@ import { BrandResponseDto } from '../../brand/res/brand-response.dto';
 import { CategoryResponseDto } from '../../category/res/category-response.dto';
 import { LabelResponseDto } from '../../label/res/label-response.dto';
 import { ProductOptionGroupResponseDto } from '../../product-option/res/product-option-group-response.dto';
-import { ProductType } from 'apps/product-service/src/generated/prisma/enums';
+import { ProductType } from '../../../../enums/product-type.enum';
 import { ProductAttributeResponseDto } from '../../product-variant/res/product-attribute-response.dto';
 import { ProductVariantResponseDto } from '../../product-variant/res/product-variant-response.dto';
 

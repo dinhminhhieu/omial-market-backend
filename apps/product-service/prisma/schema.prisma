@@ -6,6 +6,11 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // NestJS build ra CommonJS và Jest cũng chạy CJS. Mặc định generator
+  // `prisma-client` sinh ESM (dùng `import.meta`) → Jest parse fail
+  // ("Cannot use 'import.meta' outside a module"). Ép CJS để cả build lẫn test chạy.
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
 }
 
 datasource db {
@@ -221,7 +226,8 @@ model ProductVariant {
   compareAtPrice Decimal?  @db.Decimal(12, 2)
   saleStartAt    DateTime?
   saleEndAt      DateTime?
-  stock     Int       @default(0)
+  // KHÔNG có cột stock — tồn kho thuộc inventory-service (single source of truth).
+  // Còn cột này thì product.update sửa thẳng được số tồn → thủng sổ cái kho.
   imageUrl  String?
   status    Boolean   @default(true)
   isDeleted Boolean   @default(false)

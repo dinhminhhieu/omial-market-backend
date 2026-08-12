@@ -3,7 +3,6 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
-  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -71,11 +70,8 @@ export class CreateProductVariantDto {
   )
   saleEndAt?: string;
 
-  @ApiProperty({ example: 50, required: false, default: 0 })
-  @IsOptional()
-  @IsInt({ message: 'Số lượng tồn kho phải là số nguyên' })
-  @Min(0, { message: 'Tồn kho không được âm' })
-  stock?: number;
+  // KHÔNG nhận stock ở đây — tồn kho nhập qua inventory-service (phiếu nhập kho),
+  // product-service không sở hữu số tồn.
 
   @ApiProperty({ example: 'https://example.com/red-s.jpg', required: false })
   @IsOptional()

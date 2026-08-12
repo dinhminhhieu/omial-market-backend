@@ -2,47 +2,50 @@
 
 **Vai trò:** app HTTP duy nhất (REST + Swagger `/docs`). Facade — nhận REST,
 forward qua RabbitMQ tới service, trả kết quả. KHÔNG chứa business logic.
-**Cổng:** `http://localhost:3000` (prefix `/api`).
+**Cổng:** `http://localhost:8000` (prefix `/api`, PORT lấy từ root `.env`).
 
 ## Bản đồ file
 | File | Vai trò |
 | --- | --- |
 | [main.ts](../../apps/api-gateway/src/main.ts) | `NestFactory.create` + `setupApp` (HTTP, CORS, Swagger). Nạp dotenv root `.env`. |
 | [api-gateway.module.ts](../../apps/api-gateway/src/api-gateway.module.ts) | `ClientsModule.registerAsync` các ClientProxy RMQ + đăng ký controllers. |
-| [clients.ts](../../apps/api-gateway/src/clients.ts) | Token DI cho ClientProxy (vd `AUTH_CLIENT`). |
-| [auth/auth.controller.ts](../../apps/api-gateway/src/auth/auth.controller.ts) | 8 route REST `/auth/*` → forward RPC qua `RmqForwarder` (`@app/shared`). |
-| [brand/brand.controller.ts](../../apps/api-gateway/src/brand/brand.controller.ts) | 5 route REST `/brands/*` → forward RPC tới product-service qua `RmqForwarder`. |
+| [clients.ts](../../apps/api-gateway/src/clients.ts) | Token DI cho ClientProxy (`AUTH_CLIENT`, `PRODUCT_CLIENT`, `INVENTORY_CLIENT`). |
+| `auth-service/` | `AuthController` — 8 route `/auth/*`. |
+| `product-service/` | 5 controller: `/brands` `/labels` `/categories` `/option-templates` `/products` (CRUD chuẩn, mỗi cái 5 route). |
+| `inventory-service/` | `InventoryController` — 4 route `/inventory/*`. |
 
 ## Clients RMQ đã đăng ký
 | Token | Queue (env) | Tới service |
 | --- | --- | --- |
 | `AUTH_CLIENT` | `RMQ_AUTH_QUEUE` (`auth_queue`) | auth-service |
 | `PRODUCT_CLIENT` | `RMQ_PRODUCT_QUEUE` (`product_queue`) | product-service |
+| `INVENTORY_CLIENT` | `RMQ_INVENTORY_QUEUE` (`inventory_queue`) | inventory-service |
 
 ## Endpoints (tất cả `@Public`, prefix `/api`)
-| Method + Path | Forward tới pattern | DTO |
-| --- | --- | --- |
-| `POST /auth/login` | `auth.login` | `LoginDto` → `LoginResponseDto` |
-| `POST /auth/register` | `auth.register` | `RegisterDto` → `MessageResponseDto` |
-| `POST /auth/verify-otp` | `auth.verify_otp` | `VerifyOtpDto` → `LoginResponseDto` |
-| `POST /auth/resend-otp` | `auth.resend_otp` | `ResendOtpDto` → `MessageResponseDto` |
-| `POST /auth/forgot-password` | `auth.forgot_password` | `ForgotPasswordDto` → `MessageResponseDto` |
-| `POST /auth/reset-password` | `auth.reset_password` | `ResetPasswordDto` → `MessageResponseDto` |
-| `POST /auth/refresh` | `auth.refresh_token` | `RefreshTokenDto` → `AuthTokensDto` |
-| `POST /auth/logout` | `auth.logout` | `LogoutDto` → `MessageResponseDto` |
 
-### Brands (`/brands`, forward tới product-service, `BRAND_PATTERNS`)
-CRUD chuẩn: `POST /` (create) · `GET /` (findAll, phân trang) · `GET /:id` · `PUT /:id` (payload `{...dto, id}`) · `DELETE /:id` (soft delete).
+### Auth (`/auth`, `AUTH_PATTERNS`)
+`POST` login · register · verify-otp · resend-otp · forgot-password · reset-password · refresh · logout.
+
+### Product-service (5 resource, CRUD chuẩn)
+`/brands` `/labels` `/categories` `/option-templates` `/products` — mỗi resource:
+`POST /` · `GET /` (phân trang) · `GET /:id` · `PUT /:id` (payload `{...dto, id}`) · `DELETE /:id`.
+
+### Inventory (`/inventory`, `INVENTORY_PATTERNS`) — smoke test e2e pass 2026-08-12
+| Method + Path | Pattern | Ghi chú |
+| --- | --- | --- |
+| `POST /inventory/stock/query` | `inventory.get_stock` | **POST vì là batch query** (body chứa list ref) + `@HttpCode(200)` |
+| `POST /inventory/receive` | `inventory.receive` | Phiếu nhập kho |
+| `POST /inventory/issue` | `inventory.issue` | Phiếu xuất kho thủ công (hủy/nội bộ/trả NCC) |
+| `POST /inventory/adjust` | `inventory.adjust` | Phiếu kiểm kê (`@HttpCode(200)`) |
+| `GET /inventory/movements` | `inventory.get_movements` | Query params `refType`/`refId`/`page`/`limit` |
 
 ## Quy ước / lưu ý
-- Gọi RPC qua **`RmqForwarder`** (`@app/shared`, xem [shared-libs.md](shared-libs.md)): controller tạo instance trong constructor `new RmqForwarder(client, 'tên-service')`, route handler gọi `this.x.send(PATTERN, payload)`. Timeout 5s + map lỗi RPC (`RpcErrorPayload`) → `HttpException`, `TimeoutError` → 504 — KHÔNG tự viết lại `firstValueFrom/timeout/catchError` trong controller mới.
-- Response tự bọc envelope bởi `ResponseInterceptor` (qua `CommonModule`).
+- Gọi RPC qua **`RmqForwarder`** (`@app/shared`, xem [shared-libs.md](shared-libs.md)): controller tạo instance trong constructor `new RmqForwarder(client, 'tên-service')`, handler gọi `this.x.send(PATTERN, payload)`. Timeout 5s + map lỗi RPC → `HttpException`, `TimeoutError` → 504 — KHÔNG tự viết lại `firstValueFrom/timeout/catchError` trong controller mới.
+- Response tự bọc envelope `{success, statusCode, data, timestamp}` bởi `ResponseInterceptor` (`CommonModule`).
 - `@Public()` đánh dấu route công khai (cho khi bật AuthGuard sau).
+- Thêm service mới: token vào `clients.ts` → đăng ký trong `ClientsModule` → folder `<service>/` + controller + barrel `index.ts` → thêm vào `controllers`.
 
 ## Trạng thái & TODO
-- ✅ Đầy đủ 8 route auth: login, register, verify-otp, resend-otp, forgot/reset-password, refresh, logout.
-- ✅ `PRODUCT_CLIENT` + 5 route `/brands` CRUD (forward tới product-service).
-- ✅ Helper RPC dùng chung `RmqForwarder` (thay `forward/toHttpException` copy-paste từng controller).
-- 🟡 Route `/labels` đang code dở (label.controller.ts).
+- ✅ Auth 8 route · product 5 resource · inventory 4 route (e2e đã chạy thật: receive → get_stock → adjust → movements, cả ca lỗi 404/400 xuyên RMQ về đúng message).
 - ⬜ `JwtAuthGuard` verify access token + gắn `userId` vào payload forward.
-- ⬜ Controller cho category/product/variant + client order / inventory.
+- ⬜ Client + route cho order-service (khi migrate order).
