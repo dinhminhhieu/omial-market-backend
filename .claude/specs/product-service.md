@@ -61,6 +61,6 @@ Option item không có tồn kho — chỉ có `status` bật/tắt ("tạm hế
 ## Trạng thái & TODO
 - ✅ brand · label · category · option-template · product (CRUD đủ, controller + gateway route đủ).
 - ✅ Build + `pnpm test` xanh (22 test). Phần lớn vẫn là scaffold "should be defined".
-- ⬜ Unit test nghiệp vụ thật cho category (cycle, chặn xoá), product (invariant type, sync option/variant), option-template — coverage ≥60% (Phase 0 mục 5.2).
+- 🔶 Unit test nghiệp vụ: ✅ category (cycle, chặn xoá, slug release — 85%), ✅ option-group.validator (100%), ✅ brand. ⬜ product.service (3.8% — invariant type, sync option/variant, delete slug+sku), ⬜ option-template, ⬜ label — coverage ≥60% (Phase 0 mục 5.2).
 - ⬜ `toResponse()` của product đang `any` → nên dùng `Prisma.ProductGetPayload<...>`; hiện response còn lộ `isDeleted`, `deletedAt`, bảng nối `productLabels`.
 - ⬜ Module riêng cho product-attribute / product-variant nếu cần sửa lẻ (giờ nằm nested trong product).

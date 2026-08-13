@@ -61,6 +61,6 @@ User demo: `demo@omial.dev` / `password123`.
 | api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (5 route), order (4 route) + module media (presigned upload → MinIO) |
 | auth-service | ✅ pure microservice — **login, register+OTP, verify/resend, quên/reset mật khẩu, refresh (rotation), logout** (OTP + refresh token lưu Redis) |
 | product-service | ✅ pure microservice — **brand, label, category (cây), option-template, product (SIMPLE/OPTION/VARIANT)**. Variant **không còn cột stock** (tồn kho → inventory). Còn thiếu unit test nghiệp vụ |
-| inventory-service | ✅ pure microservice — **sổ cái tồn kho: get_stock (batch), receive, issue (conditional update), adjust (optimistic lock), get_movements** — gateway route + smoke e2e pass. Còn thiếu unit test nghiệp vụ |
-| order | ✅ pure microservice — **checkout (giá server-side, validate option/tồn qua RMQ service-to-service), máy trạng thái + history, search/phân trang** — gateway route + smoke e2e toàn hệ pass. Chưa reserve kho (Phase 2 saga). Còn thiếu unit test |
+| inventory-service | ✅ pure microservice — **sổ cái tồn kho: get_stock (batch), receive, issue (conditional update), adjust (optimistic lock), get_movements** — gateway route + smoke e2e pass + unit test nghiệp vụ (98% lines) |
+| order | ✅ pure microservice — **checkout (giá server-side, validate option/tồn qua RMQ service-to-service), máy trạng thái + history, search/phân trang** — gateway route + smoke e2e toàn hệ pass + unit test (87% lines). Chưa reserve kho (Phase 2 saga) |
 | promotion | 📐 chỉ mới thiết kế schema (campaign 5 trục + sổ cái usage) — code sau khi xong Phase 0 |

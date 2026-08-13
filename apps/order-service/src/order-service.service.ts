@@ -287,7 +287,7 @@ export class OrderServiceService {
       }
 
       let sku = product.sku;
-      let productName = product.name;
+      const productName = product.name;
       let variantName: string | null = null;
       let imageUrl: string | null =
         product.thumbnail ?? product.images?.[0] ?? null;
