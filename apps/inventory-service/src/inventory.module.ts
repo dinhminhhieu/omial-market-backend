@@ -1,10 +1,16 @@
 import { Module } from '@nestjs/common';
-import { CommonModule } from '@app/shared';
+import { buildLoggerOptions, CommonModule } from '@app/shared';
+import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from './prisma/prisma.module';
 import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
-  imports: [CommonModule, PrismaModule, InventoryModule],
+  imports: [
+    CommonModule,
+    PrismaModule,
+    InventoryModule,
+    LoggerModule.forRoot(buildLoggerOptions('inventory-service')),
+  ],
   controllers: [],
   providers: [],
 })

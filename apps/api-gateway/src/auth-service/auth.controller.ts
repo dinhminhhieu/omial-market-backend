@@ -28,6 +28,7 @@ import {
   VerifyOtpDto,
 } from '@app/event-contracts';
 import { Public, RmqForwarder } from '@app/shared';
+import { Throttle } from '@nestjs/throttler';
 import { AUTH_CLIENT } from '../clients';
 
 /**
@@ -48,6 +49,8 @@ export class AuthController {
   }
 
   @Public()
+  // Siết riêng: chống bruteforce mật khẩu (mặc định toàn hệ là 100/phút).
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập, trả về access + refresh token' })
@@ -57,6 +60,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   @Post('register')
   @ApiOperation({ summary: 'Đăng ký, gửi OTP xác thực về email' })
   @ApiCreatedResponse({ type: MessageResponseDto })
@@ -83,6 +87,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Quên mật khẩu → gửi OTP reset về email' })

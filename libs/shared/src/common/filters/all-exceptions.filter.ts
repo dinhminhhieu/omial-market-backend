@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { RpcException } from '@nestjs/microservices';
 import { Observable, throwError } from 'rxjs';
 import { ApiErrorResponse } from '../interfaces/api-response.interface';
 
@@ -100,6 +101,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message: this.resolveMessage(message ?? error, exception.message),
         // mảng message của ValidationPipe -> errors; còn lại -> null
         errors: this.toErrorList(message),
+      };
+    }
+
+    // RpcException do service tự ném (vd InternalAuthGuard) — payload đã đúng
+    // dạng RpcErrorPayload, giữ nguyên statusCode thay vì quy hết về 500.
+    if (exception instanceof RpcException) {
+      const error = exception.getError();
+      if (typeof error === 'object' && error !== null) {
+        const e = error as Partial<RpcErrorPayload>;
+        return {
+          statusCode: e.statusCode ?? HttpStatus.INTERNAL_SERVER_ERROR,
+          message: e.message ?? 'Internal server error',
+          errors: e.errors ?? null,
+        };
+      }
+      return {
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: String(error),
+        errors: null,
       };
     }
 

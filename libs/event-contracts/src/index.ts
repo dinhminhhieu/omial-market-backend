@@ -7,12 +7,16 @@ export * from './patterns/product-service/product.patterns';
 export * from './patterns/product-service/option-template.patterns';
 export * from './patterns/inventory-service/inventory.patterns';
 export * from './patterns/order-service/order.patterns';
+export * from './patterns/notification-service/notification.patterns';
 
 // Enums dùng chung
 export * from './enums/otp-purpose.enum';
 export * from './enums/product-type.enum';
 export * from './enums/stock.enum';
 export * from './enums/order-status.enum';
+
+// Integration events (payload cho emit/@EventPattern)
+export * from './events/otp-requested.event';
 
 // DTOs (payload + response, dùng chung gateway ↔ service)
 export * from './dto/auth-service/req/login.dto';

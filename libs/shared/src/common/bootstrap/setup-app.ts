@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipeOptions } from '@nestjs/common';
+import helmet from 'helmet';
 import { createValidationPipe } from '../pipes/validation-pipe.factory';
-import { loggerMiddleware } from '../middleware/logger.middleware';
 import { setupSwagger, SwaggerOptions } from './setup-swagger';
 
 export interface SetupAppOptions {
@@ -8,8 +8,6 @@ export interface SetupAppOptions {
   globalPrefix?: string | null;
   /** Bật CORS. Mặc định `true`. */
   cors?: boolean;
-  /** Bật HTTP logger middleware ở tầng sớm nhất. Mặc định `true`. */
-  httpLogger?: boolean;
   /** Ghi đè option cho global ValidationPipe. */
   validation?: ValidationPipeOptions;
   /** Cấu hình Swagger UI. Truyền `false` để tắt hẳn. Mặc định bật ở `/docs`. */
@@ -24,28 +22,36 @@ export interface SetupAppOptions {
  * await app.listen(port);
  * ```
  *
- * Áp global: prefix, CORS, ValidationPipe, HTTP logger, Swagger UI (`/docs`),
- * graceful shutdown. Filter + interceptor được đăng ký qua `CommonModule`
- * (import trong AppModule) để tận dụng DI.
+ * Áp global: helmet, CORS, prefix, ValidationPipe, Swagger UI (`/docs`),
+ * graceful shutdown. HTTP logging do LoggerModule (nestjs-pino) tự động đảm nhận.
  */
 export function setupApp(
   app: INestApplication,
   options: SetupAppOptions = {},
 ): INestApplication {
-  const {
-    globalPrefix = 'api',
-    cors = true,
-    httpLogger = true,
-    validation,
-    swagger,
-  } = options;
+  const { globalPrefix = 'api', cors = true, validation, swagger } = options;
 
-  if (httpLogger) {
-    app.use(loggerMiddleware);
-  }
+  // Security headers (CSP, HSTS, X-Frame-Options, nosniff…). Đặt SỚM NHẤT để
+  // áp cho mọi response, kể cả response lỗi.
+  // `contentSecurityPolicy` mặc định của helmet chặn inline script → vỡ Swagger
+  // UI ở /docs, nên tắt CSP khi còn bật Swagger (dev). Production tắt Swagger
+  // thì nên bật lại CSP.
+  app.use(
+    helmet({ contentSecurityPolicy: swagger === false ? undefined : false }),
+  );
 
   if (cors) {
-    app.enableCors();
+    // CORS_ORIGINS: danh sách domain FE, phân tách bằng dấu phẩy.
+    // KHÔNG để `*` khi đã có auth — trình duyệt sẽ không gửi cookie/credential
+    // tới origin wildcard, và `*` nghĩa là mọi trang web đều gọi API thay khách.
+    const origins = process.env.CORS_ORIGINS?.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+
+    app.enableCors({
+      origin: origins?.length ? origins : true, // không khai báo → cho phép mọi origin (chỉ hợp cho dev)
+      credentials: true,
+    });
   }
 
   if (globalPrefix) {

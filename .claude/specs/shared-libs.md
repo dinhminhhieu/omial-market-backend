@@ -59,3 +59,16 @@ Barrel: [src/index.ts](../../libs/event-contracts/src/index.ts).
   - Update template: `optionTemplateItems?` với item `id` optional (`UpsertOptionTemplateItemDto`) — có id = sửa, không id = thêm, vắng mặt = xoá.
 - ⚠️ "1 API tạo tất cả" ở gateway KHÁC "1 transaction": product+option chung DB (ok), nhưng **kho thuộc inventory-service DB riêng** → cần Saga (Phase 2). Variant + kho để riêng.
 - Nên viết ADR `docs/adr/` cho quyết định copy-vs-reference này.
+
+## Bảo mật & logging (Phase 0.4 + Phase 1)
+| File | Vai trò |
+| --- | --- |
+| `common/guards/jwt-auth.guard.ts` | Verify access token ở gateway, gắn `request.user` (chuẩn hoá `role` → `roles[]`). Bỏ qua route `@Public()`. |
+| `common/guards/internal-auth.guard.ts` | Chặn message RMQ thiếu header `x-internal-token`. Đăng ký global trong `CommonModule`, **chỉ áp context RPC**. |
+| `common/guards/roles.guard.ts` | Phân quyền theo `@Roles(...)`, chạy SAU JwtAuthGuard. |
+| `common/config/rmq.options.ts` | `rmqClientOptions` tự gắn `headers['x-internal-token']` cho MỌI message đi ra. |
+| `common/logger/logger.config.ts` | `buildLoggerOptions(serviceName)` — pino: JSON ở production, pino-pretty ở dev, redact `authorization`, `traceId`. |
+| `common/bootstrap/setup-app.ts` | helmet (CSP tắt khi bật Swagger) + CORS whitelist `CORS_ORIGINS` + ValidationPipe + Swagger. |
+
+`AllExceptionsFilter.normalize()` hiểu cả `RpcException` → giữ nguyên `statusCode`
+service ném ra (không quy hết về 500), nhờ vậy 401 từ InternalAuthGuard tới gateway vẫn là 401.

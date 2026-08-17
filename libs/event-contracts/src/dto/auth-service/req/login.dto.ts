@@ -1,13 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  Matches,
-  MaxLength,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 /**
  * Payload gửi kèm message `AUTH_PATTERNS.LOGIN`.
@@ -23,11 +16,13 @@ export class LoginDto {
   @Transform(({ value }) => value?.trim().toLowerCase())
   email: string;
 
+  // ⚠️ ĐĂNG NHẬP KHÔNG validate ĐỘ MẠNH mật khẩu — quy tắc mạnh/yếu chỉ áp lúc
+  // ĐẶT mật khẩu (register / reset). Bắt ở login vừa vô nghĩa (mật khẩu đã tồn
+  // tại rồi), vừa khoá cửa người dùng cũ khi chính sách siết lại, lại còn tiết
+  // lộ luật đặt mật khẩu cho kẻ dò. Chỉ cần "có gửi lên và không rỗng".
   @ApiProperty({ example: 'Password123' })
   @IsString()
-  @MinLength(8, { message: 'Mật khẩu tối thiểu 8 ký tự' })
-  @MaxLength(72, { message: 'Mật khẩu tối đa 72 ký tự' })
-  @Matches(/(?=.*[A-Z])/, { message: 'Mật khẩu phải có ít nhất 1 chữ hoa' })
-  @Matches(/(?=.*[0-9])/, { message: 'Mật khẩu phải có ít nhất 1 chữ số' })
+  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
+  @MaxLength(72, { message: 'Mật khẩu tối đa 72 ký tự' }) // giới hạn thật của bcrypt
   password: string;
 }

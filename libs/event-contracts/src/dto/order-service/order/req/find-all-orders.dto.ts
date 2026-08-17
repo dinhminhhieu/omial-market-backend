@@ -21,6 +21,15 @@ export class FindAllOrdersDto {
 
   @ApiProperty({
     required: false,
+    description: 'Lọc theo ID khách hàng',
+  })
+  @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
+  @IsString()
+  customerId?: string;
+
+  @ApiProperty({
+    required: false,
     description: 'Tìm theo mã đơn / tên / SĐT người nhận',
   })
   @IsOptional()

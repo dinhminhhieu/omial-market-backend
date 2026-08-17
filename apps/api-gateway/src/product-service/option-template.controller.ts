@@ -25,6 +25,7 @@ import {
   PaginationMetaDto,
   PaginationQueryDto,
   RmqForwarder,
+  Roles,
 } from '@app/shared';
 import { PRODUCT_CLIENT } from '../clients';
 import { OPTION_TEMPLATE_PATTERNS } from '@app/event-contracts/patterns/product-service/option-template.patterns';
@@ -37,6 +38,7 @@ export class OptionTemplateController {
     this.product = new RmqForwarder(productClient, 'product-service');
   }
 
+  @Roles('ADMIN')
   @Post()
   @ApiOperation({ summary: 'Tạo mẫu tùy chọn mới' })
   @ApiCreatedResponse({ type: OptionTemplateResponseDto })
@@ -46,6 +48,7 @@ export class OptionTemplateController {
     return this.product.send(OPTION_TEMPLATE_PATTERNS.CREATE, dto);
   }
 
+  @Roles('ADMIN')
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách mẫu tùy chọn (phân trang)' })
   @ApiOkResponse({ type: OptionTemplateResponseDto })
@@ -55,6 +58,7 @@ export class OptionTemplateController {
     return this.product.send(OPTION_TEMPLATE_PATTERNS.FIND_ALL, query);
   }
 
+  @Roles('ADMIN')
   @Get(':id')
   @ApiOperation({ summary: 'Lấy mẫu tùy chọn theo ID' })
   @ApiOkResponse({ type: OptionTemplateResponseDto })
@@ -64,6 +68,7 @@ export class OptionTemplateController {
     return this.product.send(OPTION_TEMPLATE_PATTERNS.FIND_ONE, id);
   }
 
+  @Roles('ADMIN')
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật mẫu tùy chọn' })
   @ApiOkResponse({ type: OptionTemplateResponseDto })
@@ -74,6 +79,7 @@ export class OptionTemplateController {
     return this.product.send(OPTION_TEMPLATE_PATTERNS.UPDATE, { ...dto, id });
   }
 
+  @Roles('ADMIN')
   @Delete(':id')
   @ApiOperation({ summary: 'Xoá mẫu tùy chọn' })
   @ApiOkResponse({ type: OptionTemplateResponseDto })

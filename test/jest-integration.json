@@ -1,0 +1,16 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testRegex": ".*\\.int-spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": "tsconfig.spec.json" }]
+  },
+  "testEnvironment": "node",
+  "testTimeout": 120000,
+  "maxWorkers": 1,
+  "roots": ["<rootDir>/apps/", "<rootDir>/libs/"],
+  "moduleNameMapper": {
+    "^@app/event-contracts(|/.*)$": "<rootDir>/libs/event-contracts/src/$1",
+    "^@app/shared(|/.*)$": "<rootDir>/libs/shared/src/$1"
+  }
+}

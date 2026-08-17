@@ -25,6 +25,8 @@ import {
   PaginationMetaDto,
   PaginationQueryDto,
   RmqForwarder,
+  Public,
+  Roles,
 } from '@app/shared';
 import { LABEL_PATTERNS } from '@app/event-contracts/patterns/product-service/label.patterns';
 import { PRODUCT_CLIENT } from '../clients';
@@ -37,6 +39,7 @@ export class LabelController {
     this.product = new RmqForwarder(productClient, 'product-service');
   }
 
+  @Roles('ADMIN')
   @Post()
   @ApiOperation({ summary: 'Tạo nhãn mới' })
   @ApiCreatedResponse({ type: LabelResponseDto })
@@ -46,6 +49,7 @@ export class LabelController {
     return this.product.send(LABEL_PATTERNS.CREATE, dto);
   }
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách nhãn (phân trang)' })
   @ApiOkResponse({ type: LabelResponseDto })
@@ -55,6 +59,7 @@ export class LabelController {
     return this.product.send(LABEL_PATTERNS.FIND_ALL, query);
   }
 
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Lấy nhãn theo ID' })
   @ApiOkResponse({ type: LabelResponseDto })
@@ -62,6 +67,7 @@ export class LabelController {
     return this.product.send(LABEL_PATTERNS.FIND_ONE, id);
   }
 
+  @Roles('ADMIN')
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật nhãn' })
   @ApiOkResponse({ type: LabelResponseDto })
@@ -72,6 +78,7 @@ export class LabelController {
     return this.product.send(LABEL_PATTERNS.UPDATE, { ...dto, id });
   }
 
+  @Roles('ADMIN')
   @Delete(':id')
   @ApiOperation({ summary: 'Xoá nhãn hiệu' })
   @ApiOkResponse({ type: LabelResponseDto })
