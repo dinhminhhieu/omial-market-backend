@@ -1,8 +1,11 @@
 import { config as loadEnv } from 'dotenv';
 
-// Chỉ cần env dùng chung ở root (RABBITMQ_URL, SMTP_*, tên queue).
-// notification-service CHƯA có database riêng nên không có apps/.../.env.
+import { join } from 'node:path';
+
+// Nạp env TRƯỚC khi khởi động: root (RABBITMQ_URL, SMTP_*, tên queue) +
+// .env riêng của service (DATABASE_URL — có từ 7.4 khi thêm bảng ProcessedEvent).
 loadEnv();
+loadEnv({ path: join(process.cwd(), 'apps/notification-service/.env') });
 
 import { Logger } from 'nestjs-pino';
 import { NestFactory } from '@nestjs/core';

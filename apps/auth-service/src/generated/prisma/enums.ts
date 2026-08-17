@@ -30,3 +30,11 @@ export const EProvider = {
 } as const;
 
 export type EProvider = (typeof EProvider)[keyof typeof EProvider];
+
+export const OutboxStatus = {
+  PENDING: 'PENDING',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+} as const;
+
+export type OutboxStatus = (typeof OutboxStatus)[keyof typeof OutboxStatus];

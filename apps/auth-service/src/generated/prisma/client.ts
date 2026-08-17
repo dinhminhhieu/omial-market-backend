@@ -49,3 +49,8 @@ export { Prisma };
  *
  */
 export type User = Prisma.UserModel;
+/**
+ * Model OutboxEvent
+ *
+ */
+export type OutboxEvent = Prisma.OutboxEventModel;

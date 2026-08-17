@@ -65,3 +65,50 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+// ============================================================================
+// OUTBOX PATTERN (roadmap 7.3)
+//
+// Vấn đề "dual write": ghi Postgres rồi publish RabbitMQ là 2 hệ thống khác
+// nhau, không có transaction chung. Crash ở giữa → user đã tạo nhưng event
+// bốc hơi, không ai biết mà retry.
+//
+// Cách vá: KHÔNG publish trực tiếp nữa. Ghi ý định "cần publish event này"
+// vào bảng dưới đây TRONG CÙNG transaction với việc nghiệp vụ → cùng COMMIT,
+// cùng rollback. Một worker chạy nền đọc các dòng PENDING rồi mới publish.
+//
+// Đánh đổi: đổi "có thể MẤT event" (không chấp nhận được) lấy "có thể TRÙNG
+// event" (vá được bằng idempotency ở 7.4, dựa trên eventId trong payload).
+// ============================================================================
+
+enum OutboxStatus {
+  PENDING // đã ghi, chờ worker publish
+  SENT // đã publish thành công lên broker
+  FAILED // thử quá số lần cho phép — cần người xem lại (tiền thân của DLQ 7.5)
+}
+
+model OutboxEvent {
+  id      String @id @default(uuid())
+  // Tên event, trùng với NOTIFICATION_PATTERNS.* — worker dùng làm pattern khi emit.
+  pattern String
+  // Toàn bộ payload event (đã gồm eventId + occurredAt). Json vì mỗi loại
+  // event có shape khác nhau; outbox không cần hiểu nội dung, chỉ chuyển phát.
+  payload Json
+
+  status   OutboxStatus @default(PENDING)
+  attempts Int          @default(0) // số lần worker đã thử publish
+  // Lỗi lần cuối — để debug khi status = FAILED, không phải để code đọc.
+  lastError String?
+  // Sớm nhất được thử lại (exponential backoff). null = thử ngay.
+  //
+  // ⚠️ KHÔNG CÓ CỘT NÀY THÌ: @Interval(1000) retry mỗi giây không nghỉ → broker
+  // restart 10s là đốt sạch 5 lần thử trong 5 giây, MỌI event đang chờ bị đánh
+  // FAILED vĩnh viễn dù chỉ là sự cố tạm thời. Backoff trải 5 lần thử ra ~1 phút.
+  nextRetryAt DateTime?
+
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime? // thời điểm publish thành công (null khi chưa gửi)
+
+  // Worker query "PENDING + tới hạn retry, cũ nhất trước" → index đúng chiều đó.
+  @@index([status, nextRetryAt, createdAt])
+}

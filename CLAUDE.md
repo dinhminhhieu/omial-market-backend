@@ -37,6 +37,7 @@ NestJS 11 · pnpm monorepo · RabbitMQ (`@nestjs/microservices` Transport.RMQ) �
 - [.claude/specs/inventory-service.md](.claude/specs/inventory-service.md) — inventory-service (tồn kho sổ cái: StockItem + StockMovement)
 - [.claude/specs/order-service.md](.claude/specs/order-service.md) — order-service (đơn hàng: snapshot + máy trạng thái + luồng create)
 - [.claude/specs/notification-service.md](.claude/specs/notification-service.md) — notification-service (consumer EVENT đầu tiên: otp.requested → gửi mail)
+- [.claude/specs/notification-service.md](.claude/specs/notification-service.md) — notification-service (consumer EVENT đầu tiên: otp.requested → gửi mail)
 - [.claude/specs/promotion-service.md](.claude/specs/promotion-service.md) — promotion-service (📐 mới thiết kế schema, chưa code)
 - [.claude/specs/api-gateway.md](.claude/specs/api-gateway.md) — gateway + client RMQ
 - [.claude/specs/shared-libs.md](.claude/specs/shared-libs.md) — libs/shared + libs/event-contracts
@@ -72,7 +73,8 @@ Tài khoản seed: `demo@omial.dev` (USER) · `admin@omial.dev` (ADMIN) — cùn
 | Service | Trạng thái |
 | --- | --- |
 | api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (5 route), order (4 route) + module media (presigned upload → MinIO). **Phase 1: JwtAuthGuard + RolesGuard + Throttler + helmet/CORS** |
-| auth-service | ✅ pure microservice — **login, register+OTP, verify/resend, quên/reset mật khẩu, refresh (rotation), logout** (OTP + refresh token lưu Redis) |
+| auth-service | ✅ pure microservice — **login, register+OTP, verify/resend, quên/reset mật khẩu, refresh (rotation), logout** (OTP + refresh token lưu Redis). **Phase 2: emit `otp.requested` qua OUTBOX** (không publish trực tiếp) |
+| notification-service | ✅ pure RMQ **consumer event** — nghe `otp.requested` → gửi mail OTP (MailService chuyển từ auth sang). Chưa có DB (7.4 idempotency sẽ thêm) |
 | product-service | ✅ pure microservice — **brand, label, category (cây), option-template, product (SIMPLE/OPTION/VARIANT)**. Variant **không còn cột stock** (tồn kho → inventory). Còn thiếu unit test nghiệp vụ |
 | inventory-service | ✅ pure microservice — **sổ cái tồn kho: get_stock (batch), receive, issue (conditional update), adjust (optimistic lock), get_movements** — gateway route + smoke e2e pass + unit test nghiệp vụ (98% lines) |
 | order | ✅ pure microservice — **checkout (giá server-side, validate option/tồn qua RMQ service-to-service), máy trạng thái + history, search/phân trang** — gateway route + smoke e2e toàn hệ pass + unit test (87% lines). Chưa reserve kho (Phase 2 saga) |

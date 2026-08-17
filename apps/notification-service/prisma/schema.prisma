@@ -1,0 +1,41 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// IDEMPOTENCY (roadmap 7.4)
+//
+// Vì sao cần: event có thể tới NHIỀU LẦN, từ 3 nguồn khác nhau —
+//   1. Outbox worker crash sau khi publish, trước khi đánh dấu SENT → publish lại
+//   2. RabbitMQ hứa at-least-once: ack mất trên đường → broker giao lại
+//   3. 1 event lỗi làm rollback cả batch worker → các event đã publish mất dấu SENT
+//
+// Không chống thì: gửi 2 mail OTP (phiền), và với các event sau này như
+// `payment.completed` thì TRỪ TIỀN 2 LẦN (thảm hoạ).
+//
+// Cách chống: consumer TỰ NHỚ event nào đã xử lý, dựa trên `eventId` — chính là
+// field đã khai sẵn trong envelope từ 7.2 cho đúng lúc này.
+// ============================================================================
+
+model ProcessedEvent {
+  // Chính là `eventId` trong payload event — KHÔNG @default(uuid()): id do bên
+  // PHÁT sinh ra, consumer chỉ chép lại. Đây là khoá chống trùng.
+  eventId String @id
+
+  // Tên event (`otp.requested`…) — để tra cứu/thống kê, không tham gia chống trùng.
+  pattern String
+
+  processedAt DateTime @default(now())
+
+  // Vì sao index theo thời gian: bảng này chỉ phình chứ không bao giờ nhỏ đi.
+  // Cần cron dọn dòng cũ hơn N ngày (event cũ hơn TTL của queue thì không thể
+  // tới nữa, giữ lại vô ích).
+  @@index([processedAt])
+}

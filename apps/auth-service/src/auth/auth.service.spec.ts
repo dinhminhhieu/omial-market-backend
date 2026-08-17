@@ -19,13 +19,21 @@ jest.mock('bcryptjs', () => ({
 const bcryptCompare = bcrypt.compare as unknown as jest.Mock;
 const bcryptHash = bcrypt.hash as unknown as jest.Mock;
 
-const makePrismaMock = () => ({
-  user: {
-    findUnique: jest.fn(),
-    update: jest.fn(),
-    upsert: jest.fn(),
-  },
-});
+const makePrismaMock = () => {
+  const prisma: any = {
+    user: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+    },
+  };
+  // Outbox (7.3): register bọc user.upsert + outbox.enqueue trong 1 transaction.
+  // Mock cho $transaction gọi thẳng callback với chính prismaMock làm tx.
+  // ⚠️ Mock này KHÔNG rollback thật — muốn chứng minh atomic thật phải dùng
+  // integration test (Postgres thật), xem inventory.int-spec.ts.
+  prisma.$transaction = jest.fn((cb: (tx: any) => any) => cb(prisma));
+  return prisma;
+};
 
 const userRow = (over: Partial<any> = {}) => ({
   id: 'u1',
@@ -49,9 +57,9 @@ describe('AuthService', () => {
     revoke: jest.Mock;
     revokeAll: jest.Mock;
   };
-  // Client PHÁT event thay cho MailService cũ. emit() trả Observable → mock
-  // phải có .subscribe để code `.emit(...).subscribe({error})` không nổ.
-  let notificationClient: { emit: jest.Mock };
+  // Outbox thay cho ClientProxy: auth KHÔNG publish trực tiếp nữa, chỉ ghi
+  // event vào hộp thư đi; OutboxWorker mới là nơi emit lên RabbitMQ.
+  let outbox: { enqueue: jest.Mock };
   let service: AuthService;
 
   beforeEach(() => {
@@ -72,14 +80,12 @@ describe('AuthService', () => {
       revoke: jest.fn(),
       revokeAll: jest.fn(),
     };
-    notificationClient = {
-      emit: jest.fn().mockReturnValue({ subscribe: jest.fn() }),
-    };
+    outbox = { enqueue: jest.fn().mockResolvedValue(undefined) };
     service = new AuthService(
       prisma as any,
       otp as any,
       token as any,
-      notificationClient as any,
+      outbox as any,
     );
     bcryptCompare.mockResolvedValue(true);
     bcryptHash.mockResolvedValue('hashed-new');
@@ -167,9 +173,10 @@ describe('AuthService', () => {
 
       expect(prisma.user.upsert).toHaveBeenCalled();
       expect(otp.createOtp).toHaveBeenCalledWith('a@b.com', OtpPurpose.VERIFY);
-      // Thay vì gọi mail trực tiếp, giờ PHÁT event otp.requested mang đủ dữ liệu
-      // để notification-service gửi mail.
-      expect(notificationClient.emit).toHaveBeenCalledWith(
+      // Thay vì gọi mail trực tiếp, giờ GHI event otp.requested vào outbox
+      // (tham số đầu là tx — chứng minh nó nằm trong transaction của register).
+      expect(outbox.enqueue).toHaveBeenCalledWith(
+        prisma,
         NOTIFICATION_PATTERNS.OTP_REQUESTED,
         expect.objectContaining({
           email: 'a@b.com',

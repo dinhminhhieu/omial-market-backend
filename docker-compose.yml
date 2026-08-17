@@ -47,6 +47,21 @@ services:
     volumes:
       - postgres_inventory_data:/var/lib/postgresql/data
 
+  # DB của notification-service — cần cho bảng ProcessedEvent (idempotency 7.4).
+  # Service này là service CUỐI CÙNG có DB riêng, đúng nguyên tắc
+  # database-per-service: consumer phải tự nhớ event nào đã xử lý.
+  postgres-notification:
+    image: postgres:16
+    container_name: postgres-notification
+    environment:
+      POSTGRES_DB: omial_notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres_notification_data:/var/lib/postgresql/data
+
   # postgres-promotion:
   #   image: postgres:16
   #   container_name: postgres-promotion
@@ -108,4 +123,5 @@ volumes:
   postgres_product_data:
   postgres_order_data:
   postgres_inventory_data:
+  postgres_notification_data:
   postgres_promotion_data:
