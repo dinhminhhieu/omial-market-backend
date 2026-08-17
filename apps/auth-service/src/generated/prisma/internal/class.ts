@@ -19,7 +19,7 @@ const config: runtime.GetPrismaClientConfig = {
   engineVersion: '3c6e192761c0362d496ed980de936e2f3cebcd3a',
   activeProvider: 'postgresql',
   inlineSchema:
-    '// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Get a free hosted Postgres database in seconds: `npx create-db`\n\ngenerator client {\n  provider = "prisma-client"\n  output   = "../src/generated/prisma"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n\nenum ERole {\n  USER\n  ADMIN\n}\n\nenum EGender {\n  MALE\n  FEMALE\n  OTHER\n}\n\nenum EProvider {\n  EMAIL\n  GOOGLE\n  FACEBOOK\n}\n\nmodel User {\n  id          String    @id @default(uuid())\n  email       String    @unique\n  password    String\n  userName    String?\n  fullName    String?\n  avatarUrl   String?\n  dateOfBirth DateTime?\n  gender      EGender?\n  phoneNumber String?\n  bio         String?\n\n  role            ERole     @default(USER)\n  isVerified      Boolean   @default(false)\n  provider        EProvider @default(EMAIL)\n  isEmailVerified Boolean   @default(false)\n  isActive        Boolean   @default(true)\n  isBanned        Boolean   @default(false)\n  bannedUntil     DateTime?\n  banReason       String?\n\n  nativeLanguage String? @default("vi")\n  timezone       String? @default("Asia/Ho_Chi_Minh")\n  country        String?\n\n  notificationToken String?\n\n  lastLoginAt DateTime?\n  createdAt   DateTime  @default(now())\n  updatedAt   DateTime  @updatedAt\n}\n',
+    '// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Get a free hosted Postgres database in seconds: `npx create-db`\n\ngenerator client {\n  provider     = "prisma-client"\n  output       = "../src/generated/prisma"\n  // NestJS build ra CommonJS và Jest cũng chạy CJS. Mặc định generator\n  // `prisma-client` sinh ESM (dùng `import.meta`) → Jest parse fail\n  // ("Cannot use \'import.meta\' outside a module"). Ép CJS như các service khác.\n  moduleFormat = "cjs"\n  runtime      = "nodejs"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n\nenum ERole {\n  USER\n  ADMIN\n}\n\nenum EGender {\n  MALE\n  FEMALE\n  OTHER\n}\n\nenum EProvider {\n  EMAIL\n  GOOGLE\n  FACEBOOK\n}\n\nmodel User {\n  id          String    @id @default(uuid())\n  email       String    @unique\n  password    String\n  userName    String?\n  fullName    String?\n  avatarUrl   String?\n  dateOfBirth DateTime?\n  gender      EGender?\n  phoneNumber String?\n  bio         String?\n\n  role            ERole     @default(USER)\n  isVerified      Boolean   @default(false)\n  provider        EProvider @default(EMAIL)\n  isEmailVerified Boolean   @default(false)\n  isActive        Boolean   @default(true)\n  isBanned        Boolean   @default(false)\n  bannedUntil     DateTime?\n  banReason       String?\n\n  nativeLanguage String? @default("vi")\n  timezone       String? @default("Asia/Ho_Chi_Minh")\n  country        String?\n\n  notificationToken String?\n\n  lastLoginAt DateTime?\n  createdAt   DateTime  @default(now())\n  updatedAt   DateTime  @updatedAt\n}\n',
   runtimeDataModel: {
     models: {},
     enums: {},
@@ -52,11 +52,11 @@ async function decodeBase64AsWasm(
 
 config.compilerWasm = {
   getRuntime: async () =>
-    await import('@prisma/client/runtime/query_compiler_fast_bg.postgresql.mjs'),
+    await import('@prisma/client/runtime/query_compiler_fast_bg.postgresql.js'),
 
   getQueryCompilerWasmModule: async () => {
     const { wasm } =
-      await import('@prisma/client/runtime/query_compiler_fast_bg.postgresql.wasm-base64.mjs');
+      await import('@prisma/client/runtime/query_compiler_fast_bg.postgresql.wasm-base64.js');
     return await decodeBase64AsWasm(wasm);
   },
 

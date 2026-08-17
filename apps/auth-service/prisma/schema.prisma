@@ -6,6 +6,11 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // NestJS build ra CommonJS và Jest cũng chạy CJS. Mặc định generator
+  // `prisma-client` sinh ESM (dùng `import.meta`) → Jest parse fail
+  // ("Cannot use 'import.meta' outside a module"). Ép CJS như các service khác.
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
 }
 
 datasource db {

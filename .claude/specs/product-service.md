@@ -53,7 +53,7 @@ Option item không có tồn kho — chỉ có `status` bật/tắt ("tạm hế
 
 ## Quy ước kỹ thuật
 - **Decimal → number**: Prisma trả `Decimal`, DTO response khai `number` → service map (`Number(x)`) trong `toResponse()`. Contracts không được biết tới `Decimal`.
-- **Prisma generator**: `moduleFormat = "cjs"` + `runtime = "nodejs"` trong schema. Mặc định generator `prisma-client` sinh ESM (`import.meta`) → Jest CommonJS parse fail.
+- **Prisma generator**: `moduleFormat = "cjs"` + `runtime = "nodejs"` trong schema — **BẮT BUỘC cho MỌI service** (auth từng thiếu → mọi spec import PrismaService đều gãy "Cannot use 'import.meta' outside a module"). Mặc định generator `prisma-client` sinh ESM.
 - **`$transaction`**: `product.update` truyền `{ timeout: 15_000 }` — vòng sync chạy nhiều query tuần tự, mặc định 5s dễ chạm (P2028).
 - Slug tự sinh từ `name` nếu FE bỏ trống (`buildSlugtify`); SKU tự sinh nếu trống (`generateSku`). SKU sản phẩm/variant **read-only khi update**.
 - Đổi schema → `prisma migrate dev` → **restart TS Server** (generated client nằm ngoài luồng gõ tay, IDE hay cache cũ).
@@ -61,6 +61,6 @@ Option item không có tồn kho — chỉ có `status` bật/tắt ("tạm hế
 ## Trạng thái & TODO
 - ✅ brand · label · category · option-template · product (CRUD đủ, controller + gateway route đủ).
 - ✅ Build + `pnpm test` xanh (22 test). Phần lớn vẫn là scaffold "should be defined".
-- 🔶 Unit test nghiệp vụ: ✅ category (cycle, chặn xoá, slug release — 85%), ✅ option-group.validator (100%), ✅ brand. ⬜ product.service (3.8% — invariant type, sync option/variant, delete slug+sku), ⬜ option-template, ⬜ label — coverage ≥60% (Phase 0 mục 5.2).
+- ✅ Unit test nghiệp vụ (Phase 0 mục 5.2 — DONE): product 66% (invariant type, sync option giữ id, delete slug+sku, pricing sale window) · category 85% (cycle, chặn xoá) · option-template 86% (replace-all, invariant sau update) · label 91% · validator 100%.
 - ⬜ `toResponse()` của product đang `any` → nên dùng `Prisma.ProductGetPayload<...>`; hiện response còn lộ `isDeleted`, `deletedAt`, bảng nối `productLabels`.
 - ⬜ Module riêng cho product-attribute / product-variant nếu cần sửa lẻ (giờ nằm nested trong product).

@@ -1,12 +1,18 @@
 import { RmqOptions, Transport } from '@nestjs/microservices';
+import { INTERNAL_TOKEN_HEADER } from '../constants/metadata.constants';
 
 function rabbitmqUrl(): string {
   return process.env.RABBITMQ_URL ?? '';
 }
 
 /**
- * Option cho phía CLIENT (api-gateway) — bên GỬI message.
+ * Option cho phía CLIENT (api-gateway + service gọi service) — bên GỬI message.
  * Dùng trong `ClientsModule.registerAsync(...)`.
+ *
+ * `headers` được gắn vào MỌI message đi ra: mang shared secret để bên nhận
+ * (`InternalAuthGuard`) biết message đến từ nguồn tin cậy chứ không phải ai đó
+ * publish thẳng vào queue. Để trong header thay vì payload vì payload có thể là
+ * string thuần (vd `send(FIND_ONE, id)`) và không được làm bẩn DTO.
  */
 export function rmqClientOptions(queue: string): RmqOptions {
   return {
@@ -16,6 +22,9 @@ export function rmqClientOptions(queue: string): RmqOptions {
       queue,
       // durable: queue vẫn tồn tại nếu RabbitMQ restart.
       queueOptions: { durable: true },
+      headers: {
+        [INTERNAL_TOKEN_HEADER]: process.env.INTERNAL_SERVICE_TOKEN ?? '',
+      },
     },
   };
 }

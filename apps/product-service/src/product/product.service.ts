@@ -941,6 +941,8 @@ export class ProductService {
   }
 
   private toResponse(t: any): ProductResponseDto {
+    const { isDeleted, deletedAt, productLabels, ...rest } = t;
+
     const pricing = this.calculatePricingInfo(
       Number(t.price),
       t.compareAtPrice ? Number(t.compareAtPrice) : null,
@@ -949,10 +951,10 @@ export class ProductService {
     );
 
     return {
-      ...t,
+      ...rest,
       ...pricing,
       weight: t.weight ? Number(t.weight) : null,
-      labels: t.productLabels?.map((pl: any) => pl.label),
+      labels: productLabels?.map((pl: any) => pl.label),
       productOptionGroups: t.productOptionGroups?.map((group: any) => ({
         ...group,
         productOptionItems: group.productOptionItems?.map((item: any) => ({
@@ -960,13 +962,17 @@ export class ProductService {
           extraPrice: Number(item.extraPrice),
         })),
       })),
-      productAttributes: t.productAttributes?.map((attr: any) => ({
-        ...attr,
-        values: attr.productAttributeValues?.map((val: any) => ({
-          ...val,
-        })),
-      })),
+      productAttributes: t.productAttributes?.map((attr: any) => {
+        const { productAttributeValues, ...attrRest } = attr;
+        return {
+          ...attrRest,
+          values: productAttributeValues?.map((val: any) => ({
+            ...val,
+          })),
+        };
+      }),
       productVariants: t.productVariants?.map((variant: any) => {
+        const { productVariantAttributeValues, ...variantRest } = variant;
         const vPricing = this.calculatePricingInfo(
           Number(variant.price),
           variant.compareAtPrice ? Number(variant.compareAtPrice) : null,
@@ -975,17 +981,13 @@ export class ProductService {
         );
 
         return {
-          ...variant,
+          ...variantRest,
           ...vPricing,
-          imageUrl: variant.imageUrl,
-          status: variant.status,
-          attributeValues: variant.productVariantAttributeValues?.map(
-            (vav: any) => ({
-              id: vav.productAttributeValue.id,
-              value: vav.productAttributeValue.value,
-              position: vav.productAttributeValue.position,
-            }),
-          ),
+          attributeValues: productVariantAttributeValues?.map((vav: any) => ({
+            id: vav.productAttributeValue.id,
+            value: vav.productAttributeValue.value,
+            position: vav.productAttributeValue.position,
+          })),
         };
       }),
     };

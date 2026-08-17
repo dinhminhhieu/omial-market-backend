@@ -29,6 +29,7 @@ import {
   ApiPaginatedResponse,
   PaginationMetaDto,
   RmqForwarder,
+  Roles,
 } from '@app/shared';
 import { INVENTORY_CLIENT } from '../clients';
 
@@ -43,6 +44,7 @@ export class InventoryController {
 
   // POST (không phải GET) vì đây là truy vấn BATCH — body chứa danh sách ref,
   // không nhét được vào query string. Trả 200 vì không tạo tài nguyên gì.
+  @Roles('ADMIN')
   @Post('stock/query')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tra cứu tồn kho theo danh sách ref (batch)' })
@@ -51,6 +53,7 @@ export class InventoryController {
     return this.inventory.send(INVENTORY_PATTERNS.GET_STOCK, dto);
   }
 
+  @Roles('ADMIN')
   @Post('receive')
   @ApiOperation({ summary: 'Phiếu nhập kho (lần đầu tự tạo StockItem)' })
   @ApiCreatedResponse({ type: StockItemResponseDto })
@@ -58,6 +61,7 @@ export class InventoryController {
     return this.inventory.send(INVENTORY_PATTERNS.RECEIVE, dto);
   }
 
+  @Roles('ADMIN')
   @Post('issue')
   @ApiOperation({
     summary: 'Phiếu xuất kho thủ công (hủy/hỏng, nội bộ, trả NCC)',
@@ -67,6 +71,7 @@ export class InventoryController {
     return this.inventory.send(INVENTORY_PATTERNS.ISSUE, dto);
   }
 
+  @Roles('ADMIN')
   @Post('adjust')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -77,6 +82,7 @@ export class InventoryController {
     return this.inventory.send(INVENTORY_PATTERNS.ADJUST, dto);
   }
 
+  @Roles('ADMIN')
   @Get('movements')
   @ApiOperation({ summary: 'Sổ cái kho của 1 đơn vị lưu kho (phân trang)' })
   @ApiPaginatedResponse(StockMovementResponseDto)

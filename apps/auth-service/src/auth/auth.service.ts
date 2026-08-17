@@ -1,10 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import * as bcrypt from 'bcryptjs';
 import {
   AuthTokensDto,
@@ -14,7 +18,9 @@ import {
   LoginResponseDto,
   LogoutDto,
   MessageResponseDto,
+  NOTIFICATION_PATTERNS,
   OtpPurpose,
+  OtpRequestedEvent,
   RefreshTokenDto,
   RegisterDto,
   ResendOtpDto,
@@ -22,9 +28,9 @@ import {
   VerifyOtpDto,
 } from '@app/event-contracts';
 import { PrismaService } from '../prisma/prisma.service';
+import { NOTIFICATION_CLIENT } from '../clients';
 import { OtpService } from './otp.service';
 import { TokenService } from './token.service';
-import { MailService } from '../mail/mail.service';
 
 /** Bản ghi User tối thiểu dùng để dựng AuthUserDto / ký token. */
 type UserLike = {
@@ -42,11 +48,15 @@ const BCRYPT_ROUNDS = 10;
  */
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly otp: OtpService,
     private readonly token: TokenService,
-    private readonly mail: MailService,
+    // ClientProxy để PHÁT event (thay cho gọi MailService trực tiếp).
+    @Inject(NOTIFICATION_CLIENT)
+    private readonly notificationClient: ClientProxy,
   ) {}
 
   /** Đăng nhập: check mật khẩu → chặn nếu chưa verify/bị khoá → cấp token. */
@@ -99,8 +109,13 @@ export class AuthService {
     });
 
     await this.sendOtp(dto.email, OtpPurpose.VERIFY);
+    // "ĐANG được gửi" chứ không phải "đã gửi": từ khi tách notification-service,
+    // lúc trả response mail CHƯA gửi (event vừa được phát đi). Câu chữ của luồng
+    // async phải nói đúng trạng thái async — không hứa chuyện chưa xảy ra.
+    // Nếu mail không tới, khách có lối thoát: POST /auth/resend-otp.
     return {
-      message: 'Đăng ký thành công. Mã OTP đã được gửi tới email để xác thực.',
+      message:
+        'Đăng ký thành công. Mã OTP đang được gửi tới email — nếu chưa nhận được sau ít phút, hãy bấm "Gửi lại mã".',
     };
   }
 
@@ -204,10 +219,38 @@ export class AuthService {
 
   // --- Helpers ------------------------------------------------------------
 
-  /** Sinh OTP rồi gửi mail (dùng chung cho register/verify/forgot/resend). */
+  /**
+   * Sinh OTP rồi PHÁT event `otp.requested` (dùng chung cho register/verify/
+   * forgot/resend). auth vẫn sở hữu vòng đời OTP (sinh mã + lưu Redis); việc
+   * GỬI email đã tách sang notification-service.
+   */
   private async sendOtp(email: string, purpose: OtpPurpose): Promise<void> {
     const { code, expiresInMinutes } = await this.otp.createOtp(email, purpose);
-    await this.mail.sendOtpEmail(email, code, purpose, expiresInMinutes);
+
+    const event: OtpRequestedEvent = {
+      eventId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      email,
+      otp: code,
+      purpose,
+      expiresInMinutes,
+    };
+
+    // emit = "phát loa rồi quên": KHÔNG await SMTP, KHÔNG chờ ai xử lý.
+    // `.subscribe()` để publish thực sự chạy (emit trả Observable lạnh — không
+    // subscribe thì không gửi gì cả). Lỗi publish (broker sập) chỉ được LOG:
+    //   ⚠️ nếu broker sập giữa "đã tạo OTP" và "publish" → event MẤT, user không
+    //   nhận mail. Đây đúng lỗ hổng mà Outbox (7.3) sẽ vá. Bước 7.2 chấp nhận.
+    this.notificationClient
+      .emit(NOTIFICATION_PATTERNS.OTP_REQUESTED, event)
+      .subscribe({
+        error: (err) =>
+          this.logger.error(
+            `Phát event otp.requested thất bại cho ${email}: ${
+              (err as Error).message
+            }`,
+          ),
+      });
   }
 
   private toAuthUser(user: UserLike): AuthUserDto {

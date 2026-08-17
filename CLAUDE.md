@@ -8,13 +8,14 @@
 
 ## Kiến trúc đích
 ```
-Client ─HTTP─► api-gateway ─(RabbitMQ send/emit)─► auth | product | order | inventory
+Client ─HTTP─► api-gateway ─(RabbitMQ send)─► auth | product | order | inventory
+                                    auth ─(emit event)─► notification
               (REST + Swagger,           (pure microservice, @MessagePattern,
                app HTTP duy nhất)         KHÔNG có HTTP)
 ```
 - **api-gateway**: cửa HTTP duy nhất, facade, không chứa business logic.
 - **4 service nội bộ**: pure RMQ microservice, mỗi service 1 queue + 1 Postgres riêng (Prisma 7 + `@prisma/adapter-pg`).
-- Auth: JWT **ký ở auth-service**, sẽ **verify ở gateway**.
+- Auth: JWT **ký ở auth-service**, **verify ở gateway** (JwtAuthGuard global) — service nội bộ không verify lại.
 
 ## Stack
 NestJS 11 · pnpm monorepo · RabbitMQ (`@nestjs/microservices` Transport.RMQ) · Prisma 7 (adapter-pg) · JWT (`@nestjs/jwt`, access + refresh) · Redis (`ioredis` — OTP + refresh token) · nodemailer (gửi OTP) · bcryptjs · class-validator.
@@ -24,7 +25,7 @@ NestJS 11 · pnpm monorepo · RabbitMQ (`@nestjs/microservices` Transport.RMQ) �
 | --- | --- |
 | `apps/api-gateway` | REST gateway |
 | `apps/auth-service` | Auth microservice (login, register+OTP, refresh, quên mật khẩu — dùng Redis) |
-| `apps/{product,order,inventory}-service` | **Chưa migrate** — vẫn REST scaffolding |
+| `apps/{product,order,inventory}-service` | Pure RMQ microservice (đã migrate xong) |
 | `libs/shared` | Hạ tầng dùng chung (RMQ options, filter, interceptor, bootstrap, dto…) |
 | `libs/event-contracts` | "Hợp đồng" message: patterns + DTO (gateway ↔ service) |
 | `docs/` | Kế hoạch + hướng dẫn (narrative) |
@@ -35,6 +36,7 @@ NestJS 11 · pnpm monorepo · RabbitMQ (`@nestjs/microservices` Transport.RMQ) �
 - [.claude/specs/product-service.md](.claude/specs/product-service.md) — product-service (brand, label, category, option-template, product + option/variant)
 - [.claude/specs/inventory-service.md](.claude/specs/inventory-service.md) — inventory-service (tồn kho sổ cái: StockItem + StockMovement)
 - [.claude/specs/order-service.md](.claude/specs/order-service.md) — order-service (đơn hàng: snapshot + máy trạng thái + luồng create)
+- [.claude/specs/notification-service.md](.claude/specs/notification-service.md) — notification-service (consumer EVENT đầu tiên: otp.requested → gửi mail)
 - [.claude/specs/promotion-service.md](.claude/specs/promotion-service.md) — promotion-service (📐 mới thiết kế schema, chưa code)
 - [.claude/specs/api-gateway.md](.claude/specs/api-gateway.md) — gateway + client RMQ
 - [.claude/specs/shared-libs.md](.claude/specs/shared-libs.md) — libs/shared + libs/event-contracts
@@ -50,17 +52,29 @@ NestJS 11 · pnpm monorepo · RabbitMQ (`@nestjs/microservices` Transport.RMQ) �
 pnpm start:gateway            # chạy gateway (HTTP :3000)
 pnpm start:auth               # chạy auth-service (nghe RabbitMQ)
 pnpm build                    # build (nest build)
+pnpm test                     # 193 unit test (mock Prisma) · pnpm test:cov (ngưỡng 65%)
+pnpm test:int                 # integration test — Postgres THẬT qua testcontainers (cần Docker)
 docker compose up -d postgres-auth rabbitmq redis   # hạ tầng (thêm redis cho OTP)
 pnpm db:migrate:auth && pnpm db:seed          # migrate + seed user demo
 ```
-User demo: `demo@omial.dev` / `password123`.
+Tài khoản seed: `demo@omial.dev` (USER) · `admin@omial.dev` (ADMIN) — cùng mật khẩu `password123`.
+
+## 🔐 Bảo mật (Phase 1 — đọc trước khi thêm route mới)
+- Gateway có **3 guard global** (đúng thứ tự): `ThrottlerGuard` → `JwtAuthGuard` → `RolesGuard`.
+  Route mới **mặc định CẦN token**; muốn công khai phải `@Public()`, muốn chỉ admin thì `@Roles('ADMIN')`.
+- Chính sách hiện tại: GET sản phẩm/danh mục/nhãn/thương hiệu = `@Public` · mọi thao tác GHI,
+  kho, mẫu option, danh sách đơn = `@Roles('ADMIN')` · tạo đơn = user đã đăng nhập.
+- **Danh tính lấy từ token, KHÔNG tin body**: gateway đè `customerId` bằng `user.sub` (xem order.controller).
+- Message RMQ phải mang header `x-internal-token` (`INTERNAL_SERVICE_TOKEN` trong `.env`) —
+  `InternalAuthGuard` trong `CommonModule` chặn mọi message publish thẳng vào queue.
 
 ## Trạng thái migrate
 | Service | Trạng thái |
 | --- | --- |
-| api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (5 route), order (4 route) + module media (presigned upload → MinIO) |
+| api-gateway | ✅ HTTP + client RMQ tới auth (8 route), product (5 resource), inventory (5 route), order (4 route) + module media (presigned upload → MinIO). **Phase 1: JwtAuthGuard + RolesGuard + Throttler + helmet/CORS** |
 | auth-service | ✅ pure microservice — **login, register+OTP, verify/resend, quên/reset mật khẩu, refresh (rotation), logout** (OTP + refresh token lưu Redis) |
 | product-service | ✅ pure microservice — **brand, label, category (cây), option-template, product (SIMPLE/OPTION/VARIANT)**. Variant **không còn cột stock** (tồn kho → inventory). Còn thiếu unit test nghiệp vụ |
 | inventory-service | ✅ pure microservice — **sổ cái tồn kho: get_stock (batch), receive, issue (conditional update), adjust (optimistic lock), get_movements** — gateway route + smoke e2e pass + unit test nghiệp vụ (98% lines) |
 | order | ✅ pure microservice — **checkout (giá server-side, validate option/tồn qua RMQ service-to-service), máy trạng thái + history, search/phân trang** — gateway route + smoke e2e toàn hệ pass + unit test (87% lines). Chưa reserve kho (Phase 2 saga) |
+| notification | ✅ pure RMQ **consumer event** — nghe `otp.requested` → gửi mail OTP (MailService chuyển từ auth sang). Chưa có DB (7.4 idempotency sẽ thêm) |
 | promotion | 📐 chỉ mới thiết kế schema (campaign 5 trục + sổ cái usage) — code sau khi xong Phase 0 |

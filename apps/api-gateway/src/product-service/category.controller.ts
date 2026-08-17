@@ -2,6 +2,8 @@ import {
   PaginationMetaDto,
   PaginationQueryDto,
   RmqForwarder,
+  Public,
+  Roles,
 } from '@app/shared';
 import {
   Body,
@@ -32,6 +34,7 @@ export class CategoryController {
     this.product = new RmqForwarder(productClient, 'product-service');
   }
 
+  @Roles('ADMIN')
   @Post()
   @ApiOperation({ summary: 'Tạo danh mục mới' })
   @ApiCreatedResponse({ type: CategoryResponseDto })
@@ -41,6 +44,7 @@ export class CategoryController {
     return this.product.send(CATEGORY_PATTERNS.CREATE, dto);
   }
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách danh mục (phân trang)' })
   @ApiOkResponse({ type: CategoryResponseDto })
@@ -51,6 +55,7 @@ export class CategoryController {
     return this.product.send(CATEGORY_PATTERNS.FIND_ALL, query);
   }
 
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Lấy danh mục theo ID' })
   @ApiOkResponse({ type: CategoryResponseDto })
@@ -58,6 +63,7 @@ export class CategoryController {
     return this.product.send(CATEGORY_PATTERNS.FIND_ONE, id);
   }
 
+  @Roles('ADMIN')
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật danh mục' })
   @ApiOkResponse({ type: CategoryResponseDto })
@@ -68,6 +74,7 @@ export class CategoryController {
     return this.product.send(CATEGORY_PATTERNS.UPDATE, { id, ...dto });
   }
 
+  @Roles('ADMIN')
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa danh mục' })
   @ApiOkResponse({ type: CategoryResponseDto })

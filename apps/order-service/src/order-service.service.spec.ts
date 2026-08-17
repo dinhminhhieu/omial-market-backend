@@ -40,7 +40,12 @@ const optionProduct = (over: Partial<any> = {}) => ({
       productOptionItems: [
         { id: 'opt-tc', name: 'Trân châu', extraPrice: 7000, status: true },
         { id: 'opt-xoai', name: 'Xoài', extraPrice: 5000, status: true },
-        { id: 'opt-off', name: 'Pudding (hết)', extraPrice: 5000, status: false },
+        {
+          id: 'opt-off',
+          name: 'Pudding (hết)',
+          extraPrice: 5000,
+          status: false,
+        },
       ],
     },
   ],
@@ -168,9 +173,7 @@ describe('OrderServiceService', () => {
     ])(
       'chặn transition không hợp lệ %s → %s, KHÔNG ghi DB',
       async (from, to) => {
-        prisma.order.findUnique.mockResolvedValue(
-          orderRow({ status: from }),
-        );
+        prisma.order.findUnique.mockResolvedValue(orderRow({ status: from }));
 
         await expect(
           service.updateStatus({ id: 'order-1', toStatus: to }),
@@ -181,7 +184,9 @@ describe('OrderServiceService', () => {
     );
 
     it('PENDING → CONFIRMED: đổi status + ghi history (from/to/note) cùng transaction', async () => {
-      prisma.order.findUnique.mockResolvedValue(orderRow({ status: 'PENDING' }));
+      prisma.order.findUnique.mockResolvedValue(
+        orderRow({ status: 'PENDING' }),
+      );
       prisma.order.update.mockResolvedValue({});
       prisma.orderStatusHistory.create.mockResolvedValue({});
       prisma.order.findUniqueOrThrow.mockResolvedValue(
@@ -210,7 +215,9 @@ describe('OrderServiceService', () => {
     });
 
     it('SHIPPING → CANCELLED (giao thất bại) là transition hợp lệ', async () => {
-      prisma.order.findUnique.mockResolvedValue(orderRow({ status: 'SHIPPING' }));
+      prisma.order.findUnique.mockResolvedValue(
+        orderRow({ status: 'SHIPPING' }),
+      );
       prisma.order.update.mockResolvedValue({});
       prisma.orderStatusHistory.create.mockResolvedValue({});
       prisma.order.findUniqueOrThrow.mockResolvedValue(
@@ -245,13 +252,15 @@ describe('OrderServiceService', () => {
     });
 
     it('đơn rỗng → BadRequest', async () => {
-      await expect(service.create(baseCreateDto({ items: [] }))).rejects.toThrow(
-        /ít nhất 1 sản phẩm/,
-      );
+      await expect(
+        service.create(baseCreateDto({ items: [] })),
+      ).rejects.toThrow(/ít nhất 1 sản phẩm/);
     });
 
     it('product-service báo lỗi/không có sản phẩm → NotFound', async () => {
-      productClient.send.mockReturnValue(throwError(() => new Error('rmq down')));
+      productClient.send.mockReturnValue(
+        throwError(() => new Error('rmq down')),
+      );
       await expect(service.create(baseCreateDto())).rejects.toThrow(
         NotFoundException,
       );
@@ -280,7 +289,11 @@ describe('OrderServiceService', () => {
         service.create(
           baseCreateDto({
             items: [
-              { productId: 'prod-1', quantity: 1, optionItemIds: ['opt-cua-sp-khac'] },
+              {
+                productId: 'prod-1',
+                quantity: 1,
+                optionItemIds: ['opt-cua-sp-khac'],
+              },
             ],
           }),
         ),
@@ -291,7 +304,9 @@ describe('OrderServiceService', () => {
       await expect(
         service.create(
           baseCreateDto({
-            items: [{ productId: 'prod-1', quantity: 1, optionItemIds: ['opt-off'] }],
+            items: [
+              { productId: 'prod-1', quantity: 1, optionItemIds: ['opt-off'] },
+            ],
           }),
         ),
       ).rejects.toThrow(/không hợp lệ/);
@@ -343,7 +358,8 @@ describe('OrderServiceService', () => {
         }),
       );
 
-      const line = prisma.order.create.mock.calls[0][0].data.orderItems.create[0];
+      const line =
+        prisma.order.create.mock.calls[0][0].data.orderItems.create[0];
       expect(line.unitPrice).toBe(150000); // giá variant, không phải 100k
       expect(line.sku).toBe('SKU-AO-DO-S');
       expect(line.variantName).toBe('Đỏ / S');

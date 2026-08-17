@@ -47,7 +47,7 @@ model Order {
   shippingAddress String?
   note            String?
 
-  // Tiền — snapshot toàn bộ, Decimal(12,2) như product-service.
+  // Tiền — snapshot toàn bộ
   // GIÁ DO SERVER TỰ TÍNH từ product-service — không bao giờ nhận giá từ FE.
   subtotal       Decimal @db.Decimal(12, 2) // tổng lineTotal các item
   shippingFee    Decimal @default(0) @db.Decimal(12, 2)

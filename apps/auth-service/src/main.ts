@@ -5,7 +5,7 @@ import { join } from 'node:path';
 loadEnv();
 loadEnv({ path: join(process.cwd(), 'apps/auth-service/.env') });
 
-import { Logger } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions } from '@nestjs/microservices';
 import { rmqServerOptions, setupMicroservice } from '@app/shared';
@@ -21,12 +21,17 @@ async function bootstrap() {
   // Pure microservice: KHÔNG có HTTP, chỉ nghe message trên RabbitMQ queue.
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AuthServiceModule,
-    rmqServerOptions(queue),
+    {
+      ...rmqServerOptions(queue),
+      bufferLogs: true,
+    },
   );
+  const logger = app.get(Logger);
+  app.useLogger(logger);
   setupMicroservice(app); // gắn ValidationPipe cho @Payload()
 
   await app.listen();
-  Logger.log(
+  logger.log(
     `🚀 auth-service listening RabbitMQ queue "${queue}"`,
     'Bootstrap',
   );

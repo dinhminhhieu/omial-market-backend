@@ -1,5 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
-import { assertOptionGroupValid, OptionItemLike } from './option-group.validator';
+import {
+  assertOptionGroupValid,
+  OptionItemLike,
+} from './option-group.validator';
 
 // Helper: sinh n item thường (không default, đang bật)
 const items = (n: number): OptionItemLike[] =>
@@ -12,7 +15,9 @@ describe('assertOptionGroupValid', () => {
   });
 
   it('min/max null|undefined được coi là 0 / không giới hạn', () => {
-    expect(() => assertOptionGroupValid(null, undefined, items(2))).not.toThrow();
+    expect(() =>
+      assertOptionGroupValid(null, undefined, items(2)),
+    ).not.toThrow();
     expect(() => assertOptionGroupValid(undefined, null, [])).not.toThrow();
   });
 
@@ -62,8 +67,8 @@ describe('assertOptionGroupValid', () => {
   });
 
   it('gắn tên nhóm vào message lỗi (context)', () => {
-    expect(() => assertOptionGroupValid(3, 2, items(5), 'Nhóm "Topping"')).toThrow(
-      /Nhóm "Topping"/,
-    );
+    expect(() =>
+      assertOptionGroupValid(3, 2, items(5), 'Nhóm "Topping"'),
+    ).toThrow(/Nhóm "Topping"/);
   });
 });

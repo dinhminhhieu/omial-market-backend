@@ -17,8 +17,13 @@ export * from './dto/api-response.dto';
 // Filters
 export * from './filters/all-exceptions.filter';
 
+// Utils
+export * from './utils/user-role.util';
+
 // Guards
 export * from './guards/roles.guard';
+export * from './guards/jwt-auth.guard';
+export * from './guards/internal-auth.guard';
 
 // Interceptors
 export * from './interceptors/logging.interceptor';
@@ -32,8 +37,9 @@ export * from './middleware/logger.middleware';
 export * from './pipes/parse-positive-int.pipe';
 export * from './pipes/validation-pipe.factory';
 
-// Config (RabbitMQ transport options)
+// Config (RabbitMQ transport options & Pino Logger)
 export * from './config/rmq.options';
+export * from './logger/logger.config';
 
 // RMQ (helper gọi RPC từ gateway: timeout + map lỗi → HttpException)
 export * from './rmq/rmq-forwarder';

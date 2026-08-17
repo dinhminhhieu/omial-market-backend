@@ -151,24 +151,50 @@ khi không thể `JOIN` cross-service. Và việc migrate từng module một (h
 mới chạy song song) chính là pattern **Strangler Fig** — bạn đang áp dụng mà
 không biết tên.
 
-### 5.2. Unit test có ý nghĩa
+### 5.2. Unit test có ý nghĩa — ✅ XONG (2026-08-13: 169 test, 70.6% stmts)
 
-- [ ] Coverage tối thiểu **60%** cho mọi service (không đuổi 100% mù quáng).
-- [ ] Ưu tiên test **business logic** — bỏ test tautology.
-- [ ] Setup `tsconfig.spec.json` + `jest.mock` cho Prisma (đã có mẫu ở [apps/product-service/src/brand/brand.service.spec.ts](apps/product-service/src/brand/brand.service.spec.ts)).
-- [ ] Chạy `pnpm test:cov` xanh trước mỗi commit.
+- [x] Coverage tối thiểu **60%** → đạt **70.6%**; `coverageThreshold` 65/50/65 đã bật
+      trong `package.json` → `pnpm test:cov` tự FAIL nếu tụt.
+- [x] `collectCoverageFrom` chỉ đo `*.service.ts` + `*.validator.ts` + libs — loại
+      generated/dto/module/main (wiring không có logic, test chỉ để làm đẹp số).
+- [x] Ưu tiên business logic: máy trạng thái order, optimistic lock + conditional
+      update inventory, cycle category, invariant product type, sync option giữ id,
+      OTP (băm/cooldown/brute-force), token rotation, chống email enumeration.
+- [x] Mẫu mock dùng lại được: `$transaction: jest.fn(cb => cb(prismaMock))` ·
+      ClientProxy `{ send: jest.fn(() => of(x)) }` · `jest.mock('bcryptjs')`
+      (spyOn không ghi đè được — property non-configurable).
+- Còn nợ: `product.service` 66% (nhánh sync variant/attribute), `all-exceptions.filter`,
+  `roles.guard` (test khi làm Phase 1).
 
-### 5.3. Integration test đầu tiên
+### 5.3. Integration test đầu tiên — ✅ XONG (2026-08-13)
 
-- [ ] Cài `testcontainers` — chạy Postgres thật trong test.
-- [ ] Viết 1 spec integration cho auth-service login flow (DB thật, Redis mock).
-- [ ] Setup jest project riêng cho integration (`jest-integration.config.ts`).
+- [x] `@testcontainers/postgresql` — bật Postgres 16 THẬT trong Docker mỗi lần chạy.
+- [x] Config riêng `test/jest-integration.json` (match `*.int-spec.ts`, `maxWorkers:1`,
+      timeout 120s); script `pnpm test:int`. **Bẫy: unit `testRegex` `.*\.spec\.ts$`
+      cũng khớp `*.int-spec.ts`** → thêm `testPathIgnorePatterns` để `pnpm test`
+      không vô tình bật Docker.
+- [x] Helper dùng chung `libs/shared/src/testing/postgres-container.ts`:
+      bật container → chạy `prisma migrate deploy` THẬT (chứng minh migration apply
+      sạch từ 0) → trả `databaseUrl`. **KHÔNG export trong barrel** (kéo devDep vào build).
+- [x] Chọn **inventory** thay vì auth-login (roadmap gợi ý): inventory có nhiều ràng
+      buộc DB đáng chứng minh nhất, login lại phải mock Redis nên giá trị thấp hơn.
+- [x] 7 ca CHỈ integration test bắt được (mock không thấy):
+      CHECK `reserved <= onHand` + `onHand >= 0` thật sự chặn raw UPDATE ·
+      unique `(refType, refId)` giữ đúng 1 dòng khi upsert · conditional UPDATE chặn
+      oversell ở tầng DB · bất biến sổ cái `onHand == SUM(delta)` đúng sau chuỗi thao tác.
+- Giá trị: unit test mock Prisma → chưa câu query nào từng chạy thật; `$transaction`
+  mock `cb=>cb(prisma)` KHÔNG rollback. Integration test vá đúng lỗ hổng đó.
 
-### 5.4. Structured logging cơ bản
+### 5.4. Structured logging cơ bản — ✅ XONG (2026-08-13)
 
-- [ ] Thay `Logger` mặc định bằng `pino` (JSON output).
-- [ ] Mỗi log có: `service`, `timestamp`, `level`, `message`, `context`.
-- [ ] Chuẩn bị field `correlationId` (sẽ dùng ở Phase 4).
+- [x] `nestjs-pino` thay `Logger` mặc định ở CẢ 5 app; config dùng chung 1 chỗ
+      (`libs/shared/.../logger.config.ts` → `buildLoggerOptions(serviceName)`).
+- [x] Mỗi dòng log có `service`, `time`, `level`, `msg`, `context` + `responseTime`.
+      Dev dùng `pino-pretty`, production ra JSON thuần (điều kiện `NODE_ENV`).
+- [x] `redact` che `req.headers.authorization` (quan trọng từ Phase 1 — token nằm ở đó).
+- [x] `customProps` gắn sẵn `traceId` (hiện = `req.id`, counter theo tiến trình) —
+      Phase 4 thay bằng UUID truyền xuyên service là xong.
+- [x] Gỡ `loggerMiddleware` cũ khỏi `setupApp()` (pino-http đã tự log request → tránh log 2 lần).
 
 ### 5.5. Chiến lược xoá dữ liệu (data lifecycle)
 
@@ -203,49 +229,73 @@ hướng: *dữ liệu lịch sử có tham chiếu tới nó không, luật có
 **Mục tiêu**: hoàn thiện pattern **API Gateway** đúng nghĩa. Đây là bộ mặt của
 hệ thống — làm sai là **cả hệ thống bị đục lỗ**.
 
-### 6.1. JWT verify tập trung ở Gateway
+### 6.1. JWT verify tập trung ở Gateway — ✅ XONG (2026-08-13)
 
-- [ ] Tạo `JwtAuthGuard` global ở gateway (dùng `@nestjs/passport` + `passport-jwt`).
-- [ ] Tạo decorator `@Public()` để đánh dấu route không cần auth (login, register, docs).
-- [ ] Extract `userId, role` từ token → attach vào request → forward xuống service qua payload.
-- [ ] Auth-service **chỉ ký token**, không verify token cho các service khác nữa.
-- [ ] **RBAC cơ bản**: thêm field `role` vào User (USER/ADMIN), dùng `RolesGuard` + `@Roles('ADMIN')` có sẵn trong `libs/shared` — Phase 2 cần cho admin endpoint DLQ replay.
-- [ ] Test: gọi `/products` không có token → 401 tại gateway (không đụng product-service).
+- [x] `JwtAuthGuard` global ở gateway ([libs/shared/.../jwt-auth.guard.ts](libs/shared/src/common/guards/jwt-auth.guard.ts)).
+      **KHÔNG dùng passport**: gateway chỉ cần verify chữ ký + gắn `request.user`
+      (~30 dòng); passport thêm 3 dependency và che mất thứ đang cần học.
+- [x] `@Public()` (đã có sẵn) đánh dấu 8 route auth + các route GET công khai.
+- [x] Guard chuẩn hoá `role` (chuỗi, do auth ký) → `roles` (mảng, RolesGuard đọc).
+- [x] Forward danh tính: gateway **ĐÈ** `customerId` trong payload bằng `user.sub`
+      lấy từ token — FE gửi id giả cũng vô ích (đã smoke chứng minh).
+- [x] RBAC: seed 2 tài khoản `demo@omial.dev` (USER) / `admin@omial.dev` (ADMIN),
+      chính sách: GET sản phẩm/danh mục = `@Public`, mọi thao tác GHI + kho + đơn = `@Roles('ADMIN')`.
+- [x] Smoke: POST /products không token → 401 **tại gateway**; token USER → 403; ADMIN → 201.
+- [x] Unit test 13 ca cho 2 guard.
+- ⚠️ Bẫy đã dính: `JwtModule.register({secret: process.env...})` đọc env lúc
+      import → webpack hoist import lên TRƯỚC `loadEnv()` → secret `undefined` →
+      mọi token đều 401. Phải dùng `registerAsync` + `useFactory` (chạy lúc DI init).
 
 ### 6.2. Service-to-service authentication
 
 **Vấn đề**: nếu ai đó gửi trực tiếp message RMQ (bypass gateway) → làm gì cũng được. Phải chứng thực service ↔ service.
 
-- [ ] Chọn 1 trong 3 cách:
-  - **Shared secret**: gateway gắn header `X-Internal-Token` vào payload, service verify. Đơn giản nhất.
-  - **Internal JWT**: gateway ký JWT nội bộ với claim khác token user, service verify. Cẩn thận hơn.
-  - **mTLS**: cấu hình RabbitMQ + client cert. Chuẩn nhất, phức tạp.
-- [ ] Khuyến nghị: Shared secret cho học tập, note lại cost của mTLS.
+- [x] Chọn **shared secret**, đặt trong **AMQP header** `x-internal-token`
+      (KHÔNG nhét payload: nhiều pattern gửi payload là string thuần như
+      `send(FIND_ONE, id)` nên không có chỗ đính kèm, và nhét vào payload thì
+      ValidationPipe `forbidNonWhitelisted` sẽ chửi).
+      Gắn 1 lần trong `rmqClientOptions` → mọi client (gateway + service gọi service) tự có.
+- [x] `InternalAuthGuard` đăng ký global trong `CommonModule`, chỉ áp cho context
+      RPC nên gateway HTTP không ảnh hưởng.
+- [x] Đã VERIFY bằng script tấn công thật (publish thẳng vào `product_queue` bằng
+      amqplib): không token → 401, token sai → 401, token đúng → lọt.
+- Cost của mTLS (chưa làm): phải phát/gia hạn cert cho từng service + cấu hình
+  RabbitMQ TLS; đổi lại chống được cả replay lẫn lộ secret. Để dành production thật.
 
 ### 6.3. Rate limiting
 
-- [ ] Cài `@nestjs/throttler`.
-- [ ] Global limit: 100 req/phút/IP.
-- [ ] Endpoint đặc biệt: login = 5 req/phút, register = 3 req/phút.
-- [ ] Test: dùng `ab` hoặc `k6` bắn 200 req/s → gateway trả 429 sau khi vượt limit.
+- [x] `@nestjs/throttler` + `ThrottlerGuard` global (chạy TRƯỚC JwtAuthGuard —
+      chặn spam bằng thứ rẻ nhất, không tốn công verify chữ ký).
+- [x] Global 100 req/phút/IP; `@Throttle` riêng: login 5, register 3, forgot-password 3.
+- [x] Smoke: bắn 7 lần login sai → `401 401 401 401 429 429 429`.
 
-### 6.4. Input validation nghiêm
+### 6.4. Input validation nghiêm — ✅ XONG (2026-08-13)
 
-- [ ] Tất cả DTO có validator (đã làm cho brand — apply hết).
-- [ ] Response validation: dùng `ClassSerializerInterceptor` để chống leak field.
-- [ ] Test SQL injection: gửi `'; DROP TABLE brands; --` → phải reject.
+- [x] Mọi DTO có validator; ValidationPipe global bật `whitelist` +
+      `forbidNonWhitelisted` + `transform` cho CẢ gateway lẫn service.
+      Smoke: gửi field lạ `isAdmin` → `400 property isAdmin should not exist`
+      (chính là lá chắn chống **mass assignment**, không chỉ chống typo).
+- [x] `ClassSerializerInterceptor` đăng ký global trong `CommonModule`;
+      `product.toResponse()` destructure bỏ `isDeleted`/`deletedAt`/`productLabels`
+      — smoke xác nhận response không còn field nội bộ.
+- [x] SQL injection: `search='; DROP TABLE "Brand"; --` → trả 0 kết quả, bảng còn
+      nguyên. **Lý do an toàn: Prisma parameterize mọi query**, chuỗi vào `contains`
+      chỉ là dữ liệu. Nơi DUY NHẤT phải tự cẩn thận là `$queryRaw` —
+      `inventory.issue` dùng template literal của Prisma (tự parameterize), KHÔNG nối chuỗi.
 
 ### 6.5. Secret management
 
-- [ ] Tách secrets ra khỏi `.env` commit vào repo.
-- [ ] Dùng `.env.example` làm template, `.env` gitignore.
+- [x] `.env.example` (root + mỗi service) làm template, `.env` + `apps/*/.env`
+      đã gitignore (`!.env.example` để template vẫn được commit).
 - [ ] Học `docker secrets` cho compose.
 - [ ] Note: production dùng Vault / AWS Secrets Manager / K8s Secret.
 
 ### 6.6. CORS + Helmet
 
-- [ ] Cài `helmet` cho security headers.
-- [ ] Configure CORS whitelist (không dùng `*` khi có auth).
+- [x] `helmet` trong `setupApp()` — đặt sớm nhất để áp cả response lỗi.
+      CSP tắt khi còn bật Swagger (CSP mặc định chặn inline script → vỡ /docs).
+- [x] CORS whitelist qua `CORS_ORIGINS` (phân tách dấu phẩy) + `credentials: true`.
+      Bỏ trống = cho phép mọi origin, CHỈ hợp cho dev.
 
 ### Tiêu chí thành công Phase 1
 
@@ -261,12 +311,14 @@ hệ thống — làm sai là **cả hệ thống bị đục lỗ**.
 **Mục tiêu**: đảo tư duy từ RPC sync (`send`) sang event async (`emit`). **Đây là
 pattern quan trọng nhất cả roadmap** — nếu chỉ có thời gian học 1 phase, học phase này.
 
-### 7.1. So sánh `send` vs `emit` — hiểu bằng code
+### 7.1. So sánh `send` vs `emit` — ✅ XONG (2026-08-13)
 
-- [ ] Viết 1 spec chứng minh:
-  - `client.send()` → chờ response, timeout được (đã có).
-  - `client.emit()` → return ngay, không chờ ai xử lý.
-- [ ] Note vào `docs/patterns/pub-sub-vs-rpc.md`.
+- [x] Chứng minh bằng smoke thật thay vì spec: register **0.155s** (không còn chờ SMTP);
+      **tắt hẳn notification-service** → register vẫn 201/0.082s, event nằm chờ trong
+      queue (`1 message, 0 consumer`), bật lại service thì event tồn đọng tự xử lý.
+- [x] Note `docs/patterns/pub-sub-vs-rpc.md` (kèm bảng số đo + 3 điều hiểu sai).
+- Chốt quy ước: tên event **thì quá khứ** `otp.requested`; envelope `eventId` +
+      `occurredAt` cho MỌI event; `emit()` trả Observable LẠNH → phải `.subscribe()`.
 
 ### 7.2. Use case 1: `user.registered` event
 
@@ -278,10 +330,15 @@ pattern quan trọng nhất cả roadmap** — nếu chỉ có thời gian học
 
 Tasks:
 
-- [ ] Tạo `notification-service` mới — **kèm Postgres riêng** (`postgres-notification`), cần cho table `processed_event` ở mục 7.4 (đúng nguyên tắc Database per Service).
-- [ ] Move logic nodemailer từ auth-service sang notification-service.
-- [ ] Auth-service publish event thay vì gửi trực tiếp.
-- [ ] Test: register không đợi email gửi xong (< 100ms response).
+- [x] Tạo `notification-service` (nest-cli project + main + module + `@EventPattern`).
+      **Postgres riêng để dành 7.4** — chưa có DB thì chưa cần, tránh dựng hạ tầng thừa.
+- [x] Move nodemailer (MailService + MailModule + spec) từ auth-service sang — auth
+      KHÔNG còn biết gì về SMTP.
+- [x] Auth publish `otp.requested` thay vì gửi trực tiếp (dùng chung cho cả 4 luồng:
+      register / resend / forgot-password / verify).
+- [x] Test: register **0.155s** (yêu cầu <100ms cho phần xử lý; thời gian này gồm cả
+      bcrypt hash ~80ms + round-trip HTTP→RMQ→auth, không còn giây nào chờ SMTP).
+- ⚠️ Đã sửa spec auth: mock `MailService` → mock ClientProxy `{ emit: () => ({subscribe}) }`.
 
 ### 7.3. Outbox Pattern — bắt buộc cho production event-driven
 

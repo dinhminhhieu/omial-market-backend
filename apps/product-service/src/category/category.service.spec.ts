@@ -52,9 +52,9 @@ describe('CategoryService', () => {
 
     it('slug đã tồn tại → BadRequest', async () => {
       prisma.category.findUnique.mockResolvedValue(categoryRow());
-      await expect(
-        service.create({ name: 'Đồ uống' } as any),
-      ).rejects.toThrow(/đã tồn tại/);
+      await expect(service.create({ name: 'Đồ uống' } as any)).rejects.toThrow(
+        /đã tồn tại/,
+      );
     });
   });
 
@@ -68,7 +68,9 @@ describe('CategoryService', () => {
   describe('update — chống vòng lặp cây (ensureNoCycle)', () => {
     it('chọn CHÍNH NÓ làm cha → BadRequest', async () => {
       // findOne trong update
-      prisma.category.findUnique.mockResolvedValue(categoryRow({ id: 'cat-A' }));
+      prisma.category.findUnique.mockResolvedValue(
+        categoryRow({ id: 'cat-A' }),
+      );
 
       await expect(
         service.update({ id: 'cat-A', parentId: 'cat-A' } as any),
@@ -84,8 +86,10 @@ describe('CategoryService', () => {
           return Promise.resolve(categoryRow({ id: 'cat-A' }));
         }
         // ensureNoCycle walk lên tổ tiên: C → B → A
-        if (args.where.id === 'cat-C') return Promise.resolve({ parentId: 'cat-B' });
-        if (args.where.id === 'cat-B') return Promise.resolve({ parentId: 'cat-A' });
+        if (args.where.id === 'cat-C')
+          return Promise.resolve({ parentId: 'cat-B' });
+        if (args.where.id === 'cat-B')
+          return Promise.resolve({ parentId: 'cat-A' });
         return Promise.resolve(null);
       });
 
@@ -99,10 +103,13 @@ describe('CategoryService', () => {
         if (args.where.id === 'cat-A' && args.where.isDeleted === false) {
           return Promise.resolve(categoryRow({ id: 'cat-A' }));
         }
-        if (args.where.id === 'cat-X') return Promise.resolve({ parentId: null });
+        if (args.where.id === 'cat-X')
+          return Promise.resolve({ parentId: null });
         return Promise.resolve(null);
       });
-      prisma.category.update.mockResolvedValue(categoryRow({ parentId: 'cat-X' }));
+      prisma.category.update.mockResolvedValue(
+        categoryRow({ parentId: 'cat-X' }),
+      );
 
       await service.update({ id: 'cat-A', parentId: 'cat-X' } as any);
 
@@ -136,7 +143,9 @@ describe('CategoryService', () => {
     it('xoá = UPDATE isDeleted + đổi slug để giải phóng @unique', async () => {
       prisma.category.count.mockResolvedValue(0);
       prisma.product.count.mockResolvedValue(0);
-      prisma.category.update.mockResolvedValue(categoryRow({ isDeleted: true }));
+      prisma.category.update.mockResolvedValue(
+        categoryRow({ isDeleted: true }),
+      );
 
       await service.delete('cat-A');
 

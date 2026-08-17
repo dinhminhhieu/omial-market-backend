@@ -110,8 +110,10 @@ export class OrderServiceService {
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mi = String(now.getMinutes()).padStart(2, '0');
     const randomStr = randomBytes(2).toString('hex').toUpperCase();
-    return `ORD-${yy}${mm}${dd}-${randomStr}`;
+    return `ORD-${yy}${mm}${dd}${hh}${mi}-${randomStr}`;
   }
 
   async findAll(
@@ -125,6 +127,10 @@ export class OrderServiceService {
 
     if (dto.status) {
       where.status = dto.status as unknown as DbOrderStatus;
+    }
+
+    if (dto.customerId) {
+      where.customerId = dto.customerId;
     }
 
     if (dto.search) {

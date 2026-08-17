@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
-import { CommonModule, rmqClientOptions } from '@app/shared';
+import {
+  buildLoggerOptions,
+  CommonModule,
+  rmqClientOptions,
+} from '@app/shared';
+import { LoggerModule } from 'nestjs-pino';
 import { INVENTORY_CLIENT, PRODUCT_CLIENT } from './clients';
 import { PrismaModule } from './prisma/prisma.module';
 import { OrderServiceController } from './order-service.controller';
@@ -24,6 +29,7 @@ import { OrderServiceService } from './order-service.service';
           ),
       },
     ]),
+    LoggerModule.forRoot(buildLoggerOptions('order-service')),
   ],
   controllers: [OrderServiceController],
   providers: [OrderServiceService],
