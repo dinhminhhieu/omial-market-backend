@@ -311,7 +311,7 @@ hệ thống — làm sai là **cả hệ thống bị đục lỗ**.
 **Mục tiêu**: đảo tư duy từ RPC sync (`send`) sang event async (`emit`). **Đây là
 pattern quan trọng nhất cả roadmap** — nếu chỉ có thời gian học 1 phase, học phase này.
 
-### 7.1. So sánh `send` vs `emit` — ✅ XONG (2026-08-13)
+### 7.1. So sánh `send` vs `emit` — ✅ XONG (2026-08-17)
 
 - [x] Chứng minh bằng smoke thật thay vì spec: register **0.155s** (không còn chờ SMTP);
       **tắt hẳn notification-service** → register vẫn 201/0.082s, event nằm chờ trong
@@ -320,27 +320,28 @@ pattern quan trọng nhất cả roadmap** — nếu chỉ có thời gian học
 - Chốt quy ước: tên event **thì quá khứ** `otp.requested`; envelope `eventId` +
       `occurredAt` cho MỌI event; `emit()` trả Observable LẠNH → phải `.subscribe()`.
 
-### 7.2. Use case 1: `user.registered` event
+### 7.2. Use case 1: `otp.requested` event — ✅ XONG (2026-08-17)
 
-**Refactor luồng register hiện tại**:
+**Trước**: `register()` `await` nodemailer → khách chờ SMTP ~2s, và **SMTP sập là
+đăng ký fail** dù user đã nằm trong DB (bug thật, không chỉ chậm).
 
-- Hiện: `auth-service.register()` gọi thẳng nodemailer gửi OTP → chậm, coupling.
-- Mới: `auth-service.register()` chỉ lưu OTP + `emit('user.registered', { email, otp })` → return ngay 200.
-  Notification-service subscribe event → gửi email.
+**Sau**: `register()` chỉ ghi event → trả về **0.155s**. notification-service nghe
+`@EventPattern('otp.requested')` rồi gửi mail.
 
-Tasks:
+- [x] Tạo `notification-service` (pure RMQ consumer). **Chưa có DB** — thêm ở 7.4.
+- [x] `MailService` **chuyển hẳn** từ auth sang (git mv) — auth không còn dòng
+      nodemailer nào. Copy mà vẫn giữ ở auth thì chưa gọi là tách.
+- [x] Event đặt tên thì QUÁ KHỨ `otp.requested` (mô tả việc ĐÃ xảy ra), không
+      phải mệnh lệnh `send_otp` — bên phát không ra lệnh cho ai.
+- [x] Envelope chuẩn: `eventId` + `occurredAt` khai từ đầu dù 7.2 chưa dùng.
+- [x] Test: register < 200ms; **tắt hẳn notification-service** → register vẫn 201,
+      event nằm chờ trong queue, bật lại thì xử lý bù.
+- [x] Sửa câu chữ: "OTP **đang** được gửi" thay vì "đã gửi" — UI của luồng async
+      phải nói đúng trạng thái async, không hứa chuyện chưa xảy ra.
+- ⚠️ Bẫy: `emit()` trả **Observable lạnh** — không `.subscribe()` thì KHÔNG gửi gì
+      cả, mà cũng không báo lỗi.
 
-- [x] Tạo `notification-service` (nest-cli project + main + module + `@EventPattern`).
-      **Postgres riêng để dành 7.4** — chưa có DB thì chưa cần, tránh dựng hạ tầng thừa.
-- [x] Move nodemailer (MailService + MailModule + spec) từ auth-service sang — auth
-      KHÔNG còn biết gì về SMTP.
-- [x] Auth publish `otp.requested` thay vì gửi trực tiếp (dùng chung cho cả 4 luồng:
-      register / resend / forgot-password / verify).
-- [x] Test: register **0.155s** (yêu cầu <100ms cho phần xử lý; thời gian này gồm cả
-      bcrypt hash ~80ms + round-trip HTTP→RMQ→auth, không còn giây nào chờ SMTP).
-- ⚠️ Đã sửa spec auth: mock `MailService` → mock ClientProxy `{ emit: () => ({subscribe}) }`.
-
-### 7.3. Outbox Pattern — bắt buộc cho production event-driven
+### 7.3. Outbox Pattern — ✅ XONG (2026-08-17)
 
 **Vấn đề**: 
 ```ts
@@ -357,10 +358,21 @@ publish rồi rollback DB → email gửi sai sự thật.
 
 Tasks:
 
-- [ ] Tạo table `outbox_event` cho auth-service.
-- [ ] Refactor register để atomic write user + event vào outbox.
-- [ ] Tạo worker (cron 1s) publish event chưa sent.
-- [ ] Test: kill process ngay sau `create user` → restart → event vẫn được publish.
+- [x] Table `OutboxEvent` (pattern, payload Json, status, attempts, lastError,
+      **nextRetryAt**, publishedAt) + enum `OutboxStatus` — auth-service.
+- [x] `register` atomic: `$transaction { user.upsert + outbox.enqueue }`.
+      `enqueue(tx, ...)` **bắt buộc nhận tx** — tự mở transaction là quay lại dual write.
+- [x] `OutboxWorker` `@Interval(1000)`: `FOR UPDATE SKIP LOCKED` (chống 2 replica
+      publish trùng) → `firstValueFrom(emit)` → SENT; fail thì attempts++ + backoff.
+- [x] Test đã chạy: `docker stop rabbitmq` → register vẫn 201, event PENDING;
+      kill auth-service; bật lại broker + auth → event tự SENT.
+- [x] Note `docs/patterns/outbox.md`.
+- ⚠️ **Backoff là BẮT BUỘC**: `@Interval(1000)` không backoff → broker restart 10s
+      đốt sạch 5 lần thử trong 5 giây, mọi event FAILED vĩnh viễn. Dùng `nextRetryAt = now + 2^n giây`.
+- ⚠️ Thứ tự với Redis: tạo OTP (Redis) TRƯỚC rồi mới vào transaction. Ngược lại
+      crash giữa chừng → event mang mã OTP không có trong Redis.
+- Cải tiến để dành: transaction hiện ôm cả network I/O (Prisma timeout mặc định 5s).
+  Bài bản hơn là *claim pattern* (tx ngắn đánh dấu PROCESSING → publish ngoài tx → SENT).
 - [ ] Note: Debezium là alternative (CDC log Postgres).
 - [ ] Bài tập phụ (tái dùng kỹ năng cron vừa học): job `purgeTrash` xoá cứng các
   dòng soft-deleted quá 30 ngày (xem 5.5) — nhớ xử lý FK (con trước cha) và bẫy

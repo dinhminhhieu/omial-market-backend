@@ -3,12 +3,9 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  Inject,
   Injectable,
-  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
 import * as bcrypt from 'bcryptjs';
 import {
   AuthTokensDto,
@@ -28,7 +25,8 @@ import {
   VerifyOtpDto,
 } from '@app/event-contracts';
 import { PrismaService } from '../prisma/prisma.service';
-import { NOTIFICATION_CLIENT } from '../clients';
+import { Prisma } from '../generated/prisma/client';
+import { OutboxService } from '../outbox/outbox.service';
 import { OtpService } from './otp.service';
 import { TokenService } from './token.service';
 
@@ -48,15 +46,12 @@ const BCRYPT_ROUNDS = 10;
  */
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly otp: OtpService,
     private readonly token: TokenService,
-    // ClientProxy để PHÁT event (thay cho gọi MailService trực tiếp).
-    @Inject(NOTIFICATION_CLIENT)
-    private readonly notificationClient: ClientProxy,
+    // Ghi event vào hộp thư đi thay vì publish thẳng (7.3 Outbox).
+    private readonly outbox: OutboxService,
   ) {}
 
   /** Đăng nhập: check mật khẩu → chặn nếu chưa verify/bị khoá → cấp token. */
@@ -102,13 +97,19 @@ export class AuthService {
     }
 
     const hashed = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-    await this.prisma.user.upsert({
-      where: { email: dto.email },
-      update: { password: hashed, fullName: dto.fullName },
-      create: { email: dto.email, password: hashed, fullName: dto.fullName },
-    });
 
-    await this.sendOtp(dto.email, OtpPurpose.VERIFY);
+    // ⭐ TRÁI TIM CỦA OUTBOX: tạo user + ghi event vào hộp thư đi nằm trong
+    // MỘT transaction. Hai việc cùng COMMIT hoặc cùng rollback — không còn khe
+    // hở "user đã tạo mà event bốc hơi" như khi publish thẳng lên RabbitMQ.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.upsert({
+        where: { email: dto.email },
+        update: { password: hashed, fullName: dto.fullName },
+        create: { email: dto.email, password: hashed, fullName: dto.fullName },
+      });
+
+      await this.sendOtp(tx, dto.email, OtpPurpose.VERIFY);
+    });
     // "ĐANG được gửi" chứ không phải "đã gửi": từ khi tách notification-service,
     // lúc trả response mail CHƯA gửi (event vừa được phát đi). Câu chữ của luồng
     // async phải nói đúng trạng thái async — không hứa chuyện chưa xảy ra.
@@ -156,11 +157,16 @@ export class AuthService {
       if (user.isEmailVerified) {
         throw new BadRequestException('Email đã xác thực, không cần OTP');
       }
-      await this.sendOtp(dto.email, purpose);
+      // KHÔNG cần $transaction ở đây: luồng này chỉ ghi ĐÚNG MỘT dòng (outbox),
+      // mà một INSERT tự nó đã atomic. Transaction chỉ cần khi phải buộc NHIỀU
+      // lần ghi vào cùng một COMMIT (như register: user + outbox).
+      // `this.prisma` truyền được vào chỗ nhận TransactionClient vì PrismaClient
+      // có đủ các method đó.
+      await this.sendOtp(this.prisma, dto.email, purpose);
     } else if (user) {
       // RESET: chỉ gửi khi user tồn tại, nhưng luôn trả cùng 1 thông báo
       // (chống dò email).
-      await this.sendOtp(dto.email, purpose);
+      await this.sendOtp(this.prisma, dto.email, purpose);
     }
 
     return { message: 'Đã gửi lại mã OTP (nếu đủ điều kiện).' };
@@ -175,7 +181,8 @@ export class AuthService {
       where: { email: dto.email },
     });
     if (user) {
-      await this.sendOtp(dto.email, OtpPurpose.RESET_PASSWORD);
+      // Chỉ ghi 1 dòng outbox → không cần transaction (xem giải thích ở resendOtp).
+      await this.sendOtp(this.prisma, dto.email, OtpPurpose.RESET_PASSWORD);
     }
     return {
       message:
@@ -220,11 +227,25 @@ export class AuthService {
   // --- Helpers ------------------------------------------------------------
 
   /**
-   * Sinh OTP rồi PHÁT event `otp.requested` (dùng chung cho register/verify/
-   * forgot/resend). auth vẫn sở hữu vòng đời OTP (sinh mã + lưu Redis); việc
-   * GỬI email đã tách sang notification-service.
+   * Sinh OTP rồi GHI event `otp.requested` vào outbox (dùng chung cho register/
+   * verify/forgot/resend). auth vẫn sở hữu vòng đời OTP (sinh mã + lưu Redis);
+   * việc GỬI email đã tách sang notification-service.
+   *
+   * ⚠️ KHÔNG publish thẳng lên RabbitMQ nữa (7.3 Outbox) — chỉ ghi vào bảng
+   * `OutboxEvent` bằng CHÍNH `tx` mà bên gọi truyền vào, để event và việc
+   * nghiệp vụ cùng nằm trong một COMMIT. `OutboxWorker` mới là nơi publish.
+   *
+   * THỨ TỰ có chủ đích: tạo OTP (Redis) TRƯỚC, rồi mới vào transaction.
+   * - Crash sau khi ghi Redis, trước COMMIT → OTP mồ côi, TTL 5 phút tự dọn: VÔ HẠI.
+   * - Nếu làm ngược (COMMIT trước, Redis sau) mà crash giữa → event mang mã OTP
+   *   không tồn tại trong Redis → khách nhập đúng mã vẫn báo sai: HỎNG.
+   * Nguyên tắc: việc "thừa thì vô hại" làm trước, việc "thiếu thì chết" vào transaction.
    */
-  private async sendOtp(email: string, purpose: OtpPurpose): Promise<void> {
+  private async sendOtp(
+    tx: Prisma.TransactionClient,
+    email: string,
+    purpose: OtpPurpose,
+  ): Promise<void> {
     const { code, expiresInMinutes } = await this.otp.createOtp(email, purpose);
 
     const event: OtpRequestedEvent = {
@@ -236,21 +257,12 @@ export class AuthService {
       expiresInMinutes,
     };
 
-    // emit = "phát loa rồi quên": KHÔNG await SMTP, KHÔNG chờ ai xử lý.
-    // `.subscribe()` để publish thực sự chạy (emit trả Observable lạnh — không
-    // subscribe thì không gửi gì cả). Lỗi publish (broker sập) chỉ được LOG:
-    //   ⚠️ nếu broker sập giữa "đã tạo OTP" và "publish" → event MẤT, user không
-    //   nhận mail. Đây đúng lỗ hổng mà Outbox (7.3) sẽ vá. Bước 7.2 chấp nhận.
-    this.notificationClient
-      .emit(NOTIFICATION_PATTERNS.OTP_REQUESTED, event)
-      .subscribe({
-        error: (err) =>
-          this.logger.error(
-            `Phát event otp.requested thất bại cho ${email}: ${
-              (err as Error).message
-            }`,
-          ),
-      });
+    await this.outbox.enqueue(
+      tx,
+      NOTIFICATION_PATTERNS.OTP_REQUESTED,
+      // Ép sang object thường: event là class instance, Prisma Json cần plain object.
+      { ...event },
+    );
   }
 
   private toAuthUser(user: UserLike): AuthUserDto {

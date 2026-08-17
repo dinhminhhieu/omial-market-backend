@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { buildLoggerOptions, CommonModule, RedisModule } from '@app/shared';
 import { LoggerModule } from 'nestjs-pino';
 import { AuthModule } from './auth/auth.module';
+import { OutboxModule } from './outbox/outbox.module';
 
 /**
  * Module gốc của auth-service.
@@ -17,6 +18,7 @@ import { AuthModule } from './auth/auth.module';
   imports: [
     CommonModule,
     RedisModule.forRoot({ keyPrefix: 'auth:' }),
+    OutboxModule,
     AuthModule,
     LoggerModule.forRoot(buildLoggerOptions('auth-service')),
   ],

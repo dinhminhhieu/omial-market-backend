@@ -39,7 +39,9 @@ describe('JwtAuthGuard', () => {
 
   it('scheme không phải Bearer → 401 (không verify)', async () => {
     const { ctx } = makeContext({ authorization: 'Basic abc123' });
-    await expect(guard.canActivate(ctx)).rejects.toThrow(/Thiếu access token/);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(
+      /Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại./,
+    );
     expect(jwt.verifyAsync).not.toHaveBeenCalled();
   });
 

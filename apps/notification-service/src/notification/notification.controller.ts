@@ -2,6 +2,7 @@ import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { NOTIFICATION_PATTERNS, OtpRequestedEvent } from '@app/event-contracts';
 import { MailService } from '../mail/mail.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * Nghe EVENT (không phải RPC).
@@ -17,7 +18,10 @@ import { MailService } from '../mail/mail.service';
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name);
 
-  constructor(private readonly mail: MailService) {}
+  constructor(
+    private readonly mail: MailService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @EventPattern(NOTIFICATION_PATTERNS.OTP_REQUESTED)
   async handleOtpRequested(@Payload() event: OtpRequestedEvent): Promise<void> {
@@ -25,7 +29,26 @@ export class NotificationController {
       `Nhận event otp.requested cho ${event.email} (${event.purpose}) eventId=${event.eventId}`,
     );
 
-    // Việc CHẬM (gọi SMTP) giờ chạy Ở ĐÂY, không còn chặn luồng đăng ký của auth.
+    // 1. Kiểm tra Idempotency (7.4): Đánh dấu TRƯỚC, gửi SAU.
+    // Dùng unique constraint (eventId String @id) của DB để check-and-set atomic.
+    try {
+      await this.prisma.processedEvent.create({
+        data: {
+          eventId: event.eventId,
+          pattern: NOTIFICATION_PATTERNS.OTP_REQUESTED,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        this.logger.log(
+          `Bỏ qua event trùng [${event.eventId}] (${NOTIFICATION_PATTERNS.OTP_REQUESTED})`,
+        );
+        return; // Đã xử lý -> bỏ qua êm, không throw (vẫn ack bình thường)
+      }
+      throw error;
+    }
+
+    // 2. Gửi mail SAU khi đánh dấu thành công
     await this.mail.sendOtpEmail(
       event.email,
       event.otp,

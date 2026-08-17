@@ -55,7 +55,9 @@ export class JwtAuthGuard implements CanActivate {
 
     const token = this.extractToken(request);
     if (!token) {
-      throw new UnauthorizedException('Thiếu access token');
+      throw new UnauthorizedException(
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      );
     }
 
     let payload: AccessTokenPayload;
