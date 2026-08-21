@@ -1,6 +1,6 @@
 # MICROSERVICE-ROADMAP.md — Lộ trình học microservice qua project omial
 
-> File này là **bản đồ học tập cá nhân** cho việc nâng project omial-market-backend
+> File này là **bản đồ học tập cá nhân** cho việc nâng project navis-backend
 > từ "prototype REST → RMQ" thành 1 hệ thống microservice **đầy đủ pattern, có
 > test, có observability, deploy được**. Được thiết kế để đọc lại nhiều lần trong
 > 6 tháng tới. Đọc theo thứ tự phase — **đừng nhảy cóc**.
@@ -36,10 +36,10 @@ kiểm tra tiêu chí thành công, rồi mới sang phase tiếp. **Nhảy phas
 ### Cường độ đề xuất
 
 | Thời gian rảnh | Xong toàn bộ |
-|---|---|
-| 5h/tuần | 6–8 tháng |
-| 10h/tuần | 3–5 tháng |
-| Full-time | 6–8 tuần |
+| -------------- | ------------ |
+| 5h/tuần        | 6–8 tháng    |
+| 10h/tuần       | 3–5 tháng    |
+| Full-time      | 6–8 tuần     |
 
 Đừng ép nhanh. Học microservice là học **tư duy phân tán**, không phải học API mới.
 
@@ -49,10 +49,15 @@ Sau mỗi pattern học xong, viết note trong `docs/patterns/<pattern-name>.md
 
 ```markdown
 # <Pattern name>
+
 ## Vấn đề nào buộc phải dùng
+
 ## Không có thì hệ thống hỏng thế nào (scenario cụ thể)
+
 ## Cost / đánh đổi
+
 ## Code tôi đã viết ở đâu (file:line)
+
 ## Điều tôi hiểu sai lúc đầu
 ```
 
@@ -64,26 +69,26 @@ Không viết note = không hiểu = chưa xong pattern.
 
 Tính đến ngày `2026-07-29`:
 
-| Thành phần | Trạng thái |
-|---|---|
-| api-gateway | HTTP entry duy nhất, forward RMQ tới auth + product |
-| auth-service | Pure microservice, đủ luồng auth (login/register+OTP/refresh/reset) |
-| product-service | Đang migrate — mới xong module `brand` (CRUD + soft delete + pagination) |
-| order-service | REST scaffold, **chưa** migrate |
-| inventory-service | REST scaffold, **chưa** migrate |
-| DB per service | ✅ Auth + Product có Postgres riêng |
-| RMQ | ✅ Có, nhưng **chỉ dùng request-response (send/receive)** |
-| JWT verify tập trung | ❌ Chưa có Guard ở gateway |
-| Event-driven thực sự | ❌ 0 `emit()` / `EventPattern` |
-| Rate limiting | ❌ Chưa |
-| Circuit breaker | ❌ Chưa |
-| Distributed tracing | ❌ Chưa |
-| Health check | ❌ Chưa |
-| Unit test | 🟡 Mới có 10 test cho brand.service |
-| Integration test | ❌ Chưa |
-| E2E test | ❌ Chưa |
-| Dockerfile per service | ❌ Chưa |
-| CI/CD | ❌ Chưa |
+| Thành phần             | Trạng thái                                                               |
+| ---------------------- | ------------------------------------------------------------------------ |
+| api-gateway            | HTTP entry duy nhất, forward RMQ tới auth + product                      |
+| auth-service           | Pure microservice, đủ luồng auth (login/register+OTP/refresh/reset)      |
+| product-service        | Đang migrate — mới xong module `brand` (CRUD + soft delete + pagination) |
+| order-service          | REST scaffold, **chưa** migrate                                          |
+| inventory-service      | REST scaffold, **chưa** migrate                                          |
+| DB per service         | ✅ Auth + Product có Postgres riêng                                      |
+| RMQ                    | ✅ Có, nhưng **chỉ dùng request-response (send/receive)**                |
+| JWT verify tập trung   | ❌ Chưa có Guard ở gateway                                               |
+| Event-driven thực sự   | ❌ 0 `emit()` / `EventPattern`                                           |
+| Rate limiting          | ❌ Chưa                                                                  |
+| Circuit breaker        | ❌ Chưa                                                                  |
+| Distributed tracing    | ❌ Chưa                                                                  |
+| Health check           | ❌ Chưa                                                                  |
+| Unit test              | 🟡 Mới có 10 test cho brand.service                                      |
+| Integration test       | ❌ Chưa                                                                  |
+| E2E test               | ❌ Chưa                                                                  |
+| Dockerfile per service | ❌ Chưa                                                                  |
+| CI/CD                  | ❌ Chưa                                                                  |
 
 **Điểm mạnh nhất** hiện tại: kiến trúc monorepo sạch, có shared lib tốt, error
 filter đã handle RPC đúng.
@@ -105,6 +110,7 @@ Trước khi code 1 pattern, **phải trả lời được 3 câu** (viết vào
    - Mọi pattern đều đắt. Nếu bạn không thấy cost → chưa hiểu.
 
 **Ví dụ trả lời tốt** (Circuit Breaker):
+
 - Vấn đề: khi product-service chết, mỗi request gateway phải chờ 5s timeout →
   gateway hết thread → toàn hệ thống chết theo.
 - Không có: 1 service chết → cascade failure toàn hệ thống.
@@ -112,6 +118,7 @@ Trước khi code 1 pattern, **phải trả lời được 3 câu** (viết vào
   fallback response có thể sai nghiệp vụ nếu không thiết kế cẩn thận.
 
 **Ví dụ trả lời tệ** (học vẹt):
+
 - Vấn đề: kiến trúc microservice cần circuit breaker.
 - Không có: hệ thống không "chuẩn microservice".
 - Cost: không biết.
@@ -120,15 +127,15 @@ Trước khi code 1 pattern, **phải trả lời được 3 câu** (viết vào
 
 ## 4. Bảng tổng quan 6 phase
 
-| Phase | Chủ đề | Thời gian | Pattern chính |
-|---|---|---|---|
-| **0** | Hoàn thiện nền tảng | 2–3 tuần | Migration completeness, unit test coverage |
-| **1** | Security & Gateway hoàn chỉnh | 2 tuần | API Gateway đầy đủ, JWT verify, Rate limit, Service-to-service auth |
-| **2** | Event-Driven thật sự | 3–4 tuần | Publish/subscribe, Outbox, Idempotency, DLQ, Saga |
-| **3** | Resilience | 3 tuần | Circuit Breaker, Retry, Timeout, Bulkhead |
-| **4** | Observability | 3 tuần | Distributed Tracing, Log Aggregation, Metrics, Health Check |
-| **5** | Deployment & Scale | 3–4 tuần | Docker, K8s, Service Discovery via K8s, CI/CD |
-| **6** | Advanced (optional) | Khi cần | CQRS, Event Sourcing, BFF, Service Mesh |
+| Phase | Chủ đề                        | Thời gian | Pattern chính                                                       |
+| ----- | ----------------------------- | --------- | ------------------------------------------------------------------- |
+| **0** | Hoàn thiện nền tảng           | 2–3 tuần  | Migration completeness, unit test coverage                          |
+| **1** | Security & Gateway hoàn chỉnh | 2 tuần    | API Gateway đầy đủ, JWT verify, Rate limit, Service-to-service auth |
+| **2** | Event-Driven thật sự          | 3–4 tuần  | Publish/subscribe, Outbox, Idempotency, DLQ, Saga                   |
+| **3** | Resilience                    | 3 tuần    | Circuit Breaker, Retry, Timeout, Bulkhead                           |
+| **4** | Observability                 | 3 tuần    | Distributed Tracing, Log Aggregation, Metrics, Health Check         |
+| **5** | Deployment & Scale            | 3–4 tuần  | Docker, K8s, Service Discovery via K8s, CI/CD                       |
+| **6** | Advanced (optional)           | Khi cần   | CQRS, Event Sourcing, BFF, Service Mesh                             |
 
 **Tổng**: 16–19 tuần part-time nghiêm túc.
 
@@ -199,7 +206,7 @@ không biết tên.
 ### 5.5. Chiến lược xoá dữ liệu (data lifecycle)
 
 Quyết định **per-entity**, không phải chính sách toàn hệ thống. Câu hỏi định
-hướng: *dữ liệu lịch sử có tham chiếu tới nó không, luật có bắt giữ/bắt xoá không?*
+hướng: _dữ liệu lịch sử có tham chiếu tới nó không, luật có bắt giữ/bắt xoá không?_
 
 - [ ] Mỗi bảng chọn 1 trong 4 chiến lược:
   - **Soft delete** (product, category, brand, label — bị order/product tham chiếu).
@@ -207,10 +214,10 @@ hướng: *dữ liệu lịch sử có tham chiếu tới nó không, luật có
   - **Append-only** (stock movement — như sổ kế toán: sai thì ghi bù, không tẩy).
   - **Hard delete / TTL** (OTP, refresh token — Redis TTL đang làm sẵn).
 - [ ] User: soft delete + **anonymize PII** khi user yêu cầu xoá (giữ `id` cho FK
-  order, ghi đè email/tên/sđt — Nghị định 13/2023 VN, GDPR).
+      order, ghi đè email/tên/sđt — Nghị định 13/2023 VN, GDPR).
 - [ ] Bẫy **soft delete + `@unique`** (slug/sku): dòng đã xoá vẫn chiếm slug →
-  đổi slug lúc xoá (`-deleted-{ts}`) hoặc partial unique index
-  (`WHERE "isDeleted" = false` — raw SQL trong migration, Prisma chưa khai báo được).
+      đổi slug lúc xoá (`-deleted-{ts}`) hoặc partial unique index
+      (`WHERE "isDeleted" = false` — raw SQL trong migration, Prisma chưa khai báo được).
 - [ ] Viết note `docs/patterns/soft-delete.md` (cost: mọi query phải nhớ `isDeleted: false`).
 - Nâng cấp sau (Phase 2+, khi đã học cron ở Outbox): sọt rác + restore + cron
   purge quá 30 ngày.
@@ -243,8 +250,8 @@ hệ thống — làm sai là **cả hệ thống bị đục lỗ**.
 - [x] Smoke: POST /products không token → 401 **tại gateway**; token USER → 403; ADMIN → 201.
 - [x] Unit test 13 ca cho 2 guard.
 - ⚠️ Bẫy đã dính: `JwtModule.register({secret: process.env...})` đọc env lúc
-      import → webpack hoist import lên TRƯỚC `loadEnv()` → secret `undefined` →
-      mọi token đều 401. Phải dùng `registerAsync` + `useFactory` (chạy lúc DI init).
+  import → webpack hoist import lên TRƯỚC `loadEnv()` → secret `undefined` →
+  mọi token đều 401. Phải dùng `registerAsync` + `useFactory` (chạy lúc DI init).
 
 ### 6.2. Service-to-service authentication
 
@@ -318,7 +325,7 @@ pattern quan trọng nhất cả roadmap** — nếu chỉ có thời gian học
       queue (`1 message, 0 consumer`), bật lại service thì event tồn đọng tự xử lý.
 - [x] Note `docs/patterns/pub-sub-vs-rpc.md` (kèm bảng số đo + 3 điều hiểu sai).
 - Chốt quy ước: tên event **thì quá khứ** `otp.requested`; envelope `eventId` +
-      `occurredAt` cho MỌI event; `emit()` trả Observable LẠNH → phải `.subscribe()`.
+  `occurredAt` cho MỌI event; `emit()` trả Observable LẠNH → phải `.subscribe()`.
 
 ### 7.2. Use case 1: `otp.requested` event — ✅ XONG (2026-08-17)
 
@@ -339,19 +346,22 @@ pattern quan trọng nhất cả roadmap** — nếu chỉ có thời gian học
 - [x] Sửa câu chữ: "OTP **đang** được gửi" thay vì "đã gửi" — UI của luồng async
       phải nói đúng trạng thái async, không hứa chuyện chưa xảy ra.
 - ⚠️ Bẫy: `emit()` trả **Observable lạnh** — không `.subscribe()` thì KHÔNG gửi gì
-      cả, mà cũng không báo lỗi.
+  cả, mà cũng không báo lỗi.
 
 ### 7.3. Outbox Pattern — ✅ XONG (2026-08-17)
 
-**Vấn đề**: 
+**Vấn đề**:
+
 ```ts
-await prisma.user.create({ data });     // 1. DB write
-await client.emit('user.registered');    // 2. Publish event
+await prisma.user.create({ data }); // 1. DB write
+await client.emit('user.registered'); // 2. Publish event
 ```
+
 Nếu crash giữa (1) và (2) → user tạo rồi nhưng không gửi email. Ngược lại
 publish rồi rollback DB → email gửi sai sự thật.
 
 **Giải pháp Outbox**:
+
 - Trong cùng transaction: `user.create()` + `outbox_event.create({ payload, status: 'pending' })`.
 - Background worker đọc `outbox_event` → publish RMQ → mark `status: 'sent'`.
 - Nếu crash: worker restart, tiếp tục xử lý event chưa sent.
@@ -368,35 +378,50 @@ Tasks:
       kill auth-service; bật lại broker + auth → event tự SENT.
 - [x] Note `docs/patterns/outbox.md`.
 - ⚠️ **Backoff là BẮT BUỘC**: `@Interval(1000)` không backoff → broker restart 10s
-      đốt sạch 5 lần thử trong 5 giây, mọi event FAILED vĩnh viễn. Dùng `nextRetryAt = now + 2^n giây`.
+  đốt sạch 5 lần thử trong 5 giây, mọi event FAILED vĩnh viễn. Dùng `nextRetryAt = now + 2^n giây`.
 - ⚠️ Thứ tự với Redis: tạo OTP (Redis) TRƯỚC rồi mới vào transaction. Ngược lại
-      crash giữa chừng → event mang mã OTP không có trong Redis.
+  crash giữa chừng → event mang mã OTP không có trong Redis.
 - Cải tiến để dành: transaction hiện ôm cả network I/O (Prisma timeout mặc định 5s).
-  Bài bản hơn là *claim pattern* (tx ngắn đánh dấu PROCESSING → publish ngoài tx → SENT).
+  Bài bản hơn là _claim pattern_ (tx ngắn đánh dấu PROCESSING → publish ngoài tx → SENT).
 - [ ] Note: Debezium là alternative (CDC log Postgres).
 - [ ] Bài tập phụ (tái dùng kỹ năng cron vừa học): job `purgeTrash` xoá cứng các
-  dòng soft-deleted quá 30 ngày (xem 5.5) — nhớ xử lý FK (con trước cha) và bẫy
-  multi-replica (cron chạy N lần khi scale).
+      dòng soft-deleted quá 30 ngày (xem 5.5) — nhớ xử lý FK (con trước cha) và bẫy
+      multi-replica (cron chạy N lần khi scale).
 - [ ] **Cảnh báo khi scale**: chạy 2+ replicas → 2 worker cùng đọc outbox → publish
-  trùng. Giải pháp: `SELECT ... FOR UPDATE SKIP LOCKED` (đơn giản, khuyến nghị)
-  hoặc pattern **Leader Election** (chỉ 1 instance làm worker). Idempotency ở
-  consumer (7.4) là lưới an toàn cuối.
+      trùng. Giải pháp: `SELECT ... FOR UPDATE SKIP LOCKED` (đơn giản, khuyến nghị)
+      hoặc pattern **Leader Election** (chỉ 1 instance làm worker). Idempotency ở
+      consumer (7.4) là lưới an toàn cuối.
 
-### 7.4. Idempotency — consumer phải chịu được duplicate
+### 7.4. Idempotency — consumer phải chịu được duplicate — ✅ XONG (2026-08-17)
 
 **Vấn đề**: RMQ có at-least-once delivery. Consumer nhận cùng event 2 lần → gửi
-email 2 lần → user pissed off.
+email 2 lần → user pissed off. Và Outbox (7.3) vừa **chủ động** đổi "mất event"
+thành "trùng event" → thiếu mục này thì 7.3 mới làm được nửa việc.
 
 **Giải pháp**:
-- Mỗi event có `eventId` (UUID).
-- Consumer lưu `processed_event(eventId)` sau khi xử lý.
-- Trước khi xử lý, check `eventId` đã có chưa → skip nếu có.
+
+- Mỗi event có `eventId` (UUID) — đã khai sẵn trong envelope từ 7.2, đúng lúc dùng.
+- Consumer lưu `ProcessedEvent(eventId)`: `eventId String @id`, **KHÔNG**
+  `@default(uuid())` — id do bên PHÁT sinh ra, consumer chỉ chép lại.
+- Check-and-set **atomic bằng chính unique constraint**: `create()` rồi catch `P2002`
+  → đã xử lý, `return` êm (không throw, để message vẫn được ack). `findUnique` rồi
+  `create` là 2 câu — 2 message song song lọt qua khe giữa.
 
 Tasks:
 
-- [ ] Thêm `eventId` vào mọi event payload.
-- [ ] Notification-service có table `processed_event`.
-- [ ] Test: publish cùng event 5 lần → chỉ gửi 1 email.
+- [x] `eventId` có trong mọi event payload (envelope từ 7.2 — `OtpRequestedEvent`).
+- [x] notification-service có **DB riêng** `omial_notification_db` (:5438,
+      `postgres-notification`) + model `ProcessedEvent` (migration
+      `20260817070403_add_processed_event`) + `@@index([processedAt])`. Service CUỐI
+      có DB riêng — đúng database-per-service: consumer phải TỰ nhớ, không đọc DB người khác.
+- [x] Chốt idempotency ở đầu `handleOtpRequested` + **3 unit test**: lần đầu (ghi +
+      gửi mail) · trùng P2002 (bỏ qua êm, KHÔNG gửi mail lần 2, KHÔNG throw) · lỗi DB
+      khác P2002 (throw lên).
+- [x] Note `docs/patterns/idempotency.md` — XONG (2026-08-19), kèm case thật: RPC command in-doubt ở inventory (504 nhưng vẫn cộng kho).
+- [ ] Cron dọn `ProcessedEvent` cũ hơn TTL queue (bảng chỉ phình; index `processedAt` đã sẵn).
+- ⚠️ **Thứ tự đã chọn: đánh dấu TRƯỚC, gửi mail SAU.** Đổi "gửi 2 mail" (phiền) lấy
+      "mất 1 mail nếu SMTP lỗi sau khi đã đánh dấu" — lần giao lại sẽ bị coi là trùng.
+      Với `noAck: true` thì handler lỗi cũng mất event luôn. Cả hai lỗ này là việc của 7.5.
 
 ### 7.5. Dead Letter Queue (DLQ)
 
@@ -404,11 +429,13 @@ Tasks:
 infinite loop, block queue.
 
 **Giải pháp**:
+
 - Retry tối đa 3 lần.
 - Sau 3 lần fail → chuyển vào `dlq_notification`.
 - Có endpoint admin `POST /admin/dlq/replay/:eventId` để replay khi fix xong.
 
 Tasks:
+
 - [ ] Config RMQ với dead-letter-exchange.
 - [ ] Test: mock SMTP fail → sau 3 lần retry event vào DLQ.
 - [ ] Admin route để list + replay DLQ (route này phải có auth admin!).
@@ -419,8 +446,15 @@ Tasks:
 có distributed transaction. Nếu bước 2 fail sau khi bước 1 xong → dữ liệu bẩn.
 
 **Giải pháp Saga**: mỗi bước có **compensating action**.
+
 - Order created → Inventory reserved → Payment charged → Order confirmed.
 - Nếu Payment fail → Compensate Inventory (release) → Compensate Order (cancel).
+
+⚠️ **Điều kiện tiên quyết — step + compensation PHẢI idempotent**: mọi bước đi qua
+RMQ (at-least-once) → `reserveInventory`/`releaseInventory` có thể được giao 2 lần;
+release 2 lần là kho ảo. May là saga có sẵn khoá tự nhiên: **orderId/sagaId** —
+reserve cho order X lần 2 = no-op. (Idempotency-Key tổng quát do FE sinh cho
+command người dùng là chuyện của 8.2b; xem `docs/patterns/idempotency.md`.)
 
 Chọn **Orchestration** (dễ debug hơn Choreography):
 
@@ -447,14 +481,14 @@ Cách làm — tái dùng nguyên bộ đồ nghề 7.1→7.5, không học thê
 
 - [ ] Mỗi service emit domain event khi WRITE: `product.updated { actor, entityId, before, after, eventId }` (outbox 7.3 đảm bảo không mất).
 - [ ] Audit consumer (nhét chung notification-service hoặc audit-service riêng) hứng
-  mọi `*.created/updated/deleted` → ghi bảng `AuditLog(actor, action, entity, entityId, before, after, createdAt)` — append-only như StockMovement.
+      mọi `*.created/updated/deleted` → ghi bảng `AuditLog(actor, action, entity, entityId, before, after, createdAt)` — append-only như StockMovement.
 - [ ] Idempotent theo `eventId` (7.4) — audit ghi trùng là sai sự thật.
 - [ ] Endpoint tra cứu: `GET /audit?entity=product&entityId=...` (phân trang).
 - [ ] **KHÔNG audit GET** — chỉ audit theo RỦI RO: mọi write + auth events (login
-  fail/success, đổi quyền) + read nhạy cảm nếu có (export dữ liệu). Lượt xem sản phẩm
-  là việc của analytics (hệ khác), không phải audit.
+      fail/success, đổi quyền) + read nhạy cảm nếu có (export dữ liệu). Lượt xem sản phẩm
+      là việc của analytics (hệ khác), không phải audit.
 - [ ] Chống phình: `before/after` chỉ ghi DIFF (`{price: [cũ, mới]}`), partition bảng
-  theo tháng + retention (archive sang cold storage sau 1–2 năm).
+      theo tháng + retention (archive sang cold storage sau 1–2 năm).
 - [ ] Note `docs/patterns/audit-log.md`: vì sao audit qua event chứ không phải interceptor per-service (không chặn request chính, không quên khi thêm service mới, tập trung 1 chỗ để đối soát) + tiêu chí audit-theo-rủi-ro ở trên.
 
 ### Tiêu chí thành công Phase 2
@@ -486,6 +520,25 @@ sống.
 - [ ] Chỉ retry idempotent operation (GET, PUT with same payload).
 - [ ] Backoff: 100ms → 200ms → 400ms → 800ms.
 - [ ] Đừng retry cho 4xx (client error).
+
+### 8.2b. Làm cho command GHI trở thành idempotent — vá bug "504 nhưng vẫn cộng kho"
+
+**Vấn đề** (bug thật 2026-08-19, phân tích đầy đủ ở `docs/patterns/idempotency.md`):
+gateway 504 KHÔNG nghĩa là lệnh chưa chạy — message vẫn nằm trong durable queue
+(in-doubt request), service bật lên là ghi DB. 8.2 chỉ CẤM gateway retry command
+không idempotent; nguồn retry thật là NGƯỜI DÙNG bấm lại thì không cấm được →
+phải làm chính command trở thành idempotent.
+
+- [ ] **Lớp 1 — TTL cho message RPC**: expiration = timeout gateway (5s) để message
+      zombie tự chết trong queue thay vì chờ service bật lại xử lý. (Vá kịch bản
+      service chết rồi restart; KHÔNG vá được kịch bản DB lag >5s → cần lớp 2.)
+- [ ] **Lớp 2 — `Idempotency-Key` cho command ghi** (inventory receive/issue/adjust
+      + tạo order): FE sinh UUID, GIỮ NGUYÊN khi bấm lại (kiểu Stripe); gateway
+      forward key qua RMQ; service lưu key với unique constraint — trùng key →
+      trả KẾT QUẢ CŨ, không chạy lại. (Gateway tự sinh key mỗi request là vô
+      dụng: bấm lại = request mới = key mới.)
+- [ ] Test: gửi receive 2 lần cùng key → onHand chỉ +1 lần, 2 response giống hệt;
+      key khác → cộng bình thường (2 lô thật sự là 2 lô).
 
 ### 8.3. Circuit Breaker
 
@@ -527,6 +580,7 @@ Invalidate khi update/delete.
 - 1 service treo (không crash) → circuit breaker open, các service khác vẫn OK.
 - Product-service down → GET product vẫn trả data (từ cache, có thể stale).
 - Deploy blue-green: SIGTERM instance cũ → không mất request nào.
+- Gửi `POST /inventory/receive` 2 lần cùng `Idempotency-Key` → kho chỉ +1 lần, response giống nhau (8.2b).
 - Note các pattern: circuit-breaker, retry-backoff, bulkhead, cache-aside, graceful-shutdown.
 
 ---
@@ -767,19 +821,24 @@ docs/
 
 ```markdown
 # ADR-XXX: <Tiêu đề quyết định>
+
 Date: YYYY-MM-DD
 Status: proposed | accepted | deprecated | superseded
 
 ## Context
+
 <Vấn đề, ràng buộc>
 
 ## Decision
+
 <Chọn gì>
 
 ## Alternatives
+
 <Đã cân nhắc gì khác, vì sao không chọn>
 
 ## Consequences
+
 <Cost, đánh đổi>
 ```
 
@@ -794,73 +853,73 @@ skill `/update-spec`.
 
 ### Communication
 
-| Pattern | Phase | Trong project dùng ở đâu |
-|---|---|---|
-| API Gateway | 1 | apps/api-gateway |
-| Sync (send/receive) | 0 | Đã có |
-| Async (emit/EventPattern) | 2 | user.registered, order.created |
-| Saga (Orchestration) | 2 | Order flow |
-| Choreography | 2 (đọc) | Chưa dùng — hiểu để so sánh |
+| Pattern                   | Phase   | Trong project dùng ở đâu       |
+| ------------------------- | ------- | ------------------------------ |
+| API Gateway               | 1       | apps/api-gateway               |
+| Sync (send/receive)       | 0       | Đã có                          |
+| Async (emit/EventPattern) | 2       | user.registered, order.created |
+| Saga (Orchestration)      | 2       | Order flow                     |
+| Choreography              | 2 (đọc) | Chưa dùng — hiểu để so sánh    |
 
 ### Data
 
-| Pattern | Phase | Trong project |
-|---|---|---|
-| Database per Service | 0 | ✅ Đã có |
-| Soft delete + retention | 0 (5.5) | brand/label/category/product (`isDeleted`, `deletedAt`) |
-| Anonymization (PII) | 0 (đọc), làm khi có yêu cầu xoá tài khoản | User trong auth-service |
-| Outbox | 2 | auth-service outbox_event |
-| Idempotency | 2 | notification-service processed_event |
-| CQRS | 6 | Product read model (optional) |
-| Event Sourcing | 6 | Order event stream (optional) |
-| API Composition | 5 | Aggregation endpoint |
+| Pattern                 | Phase                                     | Trong project                                           |
+| ----------------------- | ----------------------------------------- | ------------------------------------------------------- |
+| Database per Service    | 0                                         | ✅ Đã có                                                |
+| Soft delete + retention | 0 (5.5)                                   | brand/label/category/product (`isDeleted`, `deletedAt`) |
+| Anonymization (PII)     | 0 (đọc), làm khi có yêu cầu xoá tài khoản | User trong auth-service                                 |
+| Outbox                  | 2                                         | auth-service outbox_event                               |
+| Idempotency             | 2                                         | notification-service processed_event                    |
+| CQRS                    | 6                                         | Product read model (optional)                           |
+| Event Sourcing          | 6                                         | Order event stream (optional)                           |
+| API Composition         | 5                                         | Aggregation endpoint                                    |
 
 ### Resilience
 
-| Pattern | Phase |
-|---|---|
-| Timeout | 3 |
-| Retry + Backoff | 3 |
-| Circuit Breaker | 3 |
-| Bulkhead | 3 |
-| Cache-Aside | 3 |
-| Graceful Shutdown | 3 |
-| Dead Letter Queue | 2 |
+| Pattern           | Phase |
+| ----------------- | ----- |
+| Timeout           | 3     |
+| Retry + Backoff   | 3     |
+| Circuit Breaker   | 3     |
+| Bulkhead          | 3     |
+| Cache-Aside       | 3     |
+| Graceful Shutdown | 3     |
+| Dead Letter Queue | 2     |
 
 ### Observability
 
-| Pattern | Phase |
-|---|---|
-| Correlation ID | 4 |
-| Distributed Tracing | 4 |
-| Structured Logging | 0 (setup), 4 (aggregation) |
-| Metrics (RED) | 4 |
-| Health Check | 4 |
-| Error Tracking | 4 |
+| Pattern             | Phase                      |
+| ------------------- | -------------------------- |
+| Correlation ID      | 4                          |
+| Distributed Tracing | 4                          |
+| Structured Logging  | 0 (setup), 4 (aggregation) |
+| Metrics (RED)       | 4                          |
+| Health Check        | 4                          |
+| Error Tracking      | 4                          |
 
 ### Deployment
 
-| Pattern | Phase |
-|---|---|
-| Dockerize | 5 |
-| K8s Deployment | 5 |
-| Service Discovery (K8s DNS) | 5 |
-| CI/CD | 5 |
-| Blue-Green Deploy | 5 |
-| Canary Release | 6 |
-| Feature Flag | 6 |
-| Sidecar | 6 (via Service Mesh) |
+| Pattern                     | Phase                |
+| --------------------------- | -------------------- |
+| Dockerize                   | 5                    |
+| K8s Deployment              | 5                    |
+| Service Discovery (K8s DNS) | 5                    |
+| CI/CD                       | 5                    |
+| Blue-Green Deploy           | 5                    |
+| Canary Release              | 6                    |
+| Feature Flag                | 6                    |
+| Sidecar                     | 6 (via Service Mesh) |
 
 ### Security
 
-| Pattern | Phase |
-|---|---|
-| JWT Auth ở Gateway | 1 |
-| Service-to-Service Auth | 1 |
-| Rate Limiting | 1 |
-| Secret Management | 1 (dev), 5 (prod với K8s Secret) |
-| CORS + Helmet | 1 |
-| mTLS | 6 (Service Mesh) |
+| Pattern                 | Phase                            |
+| ----------------------- | -------------------------------- |
+| JWT Auth ở Gateway      | 1                                |
+| Service-to-Service Auth | 1                                |
+| Rate Limiting           | 1                                |
+| Secret Management       | 1 (dev), 5 (prod với K8s Secret) |
+| CORS + Helmet           | 1                                |
+| mTLS                    | 6 (Service Mesh)                 |
 
 ### Đối chiếu với Azure Cloud Design Patterns catalog
 
@@ -870,31 +929,31 @@ phải học tuần tự. Đối chiếu để không hoang mang "sao nhiều t�
 
 **Cùng pattern, Azure gọi tên khác:**
 
-| Azure gọi là | Trong roadmap này |
-|---|---|
-| Publisher-Subscriber | Phase 2 — emit/EventPattern |
-| Compensating Transaction | Phase 2 — compensating action trong Saga |
+| Azure gọi là                               | Trong roadmap này                                                                                                             |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Publisher-Subscriber                       | Phase 2 — emit/EventPattern                                                                                                   |
+| Compensating Transaction                   | Phase 2 — compensating action trong Saga                                                                                      |
 | Gateway Routing / Aggregation / Offloading | API Gateway tách 3: routing (đã có), offloading (JWT + rate limit ở gateway, Phase 1), aggregation (API Composition, Phase 5) |
-| Gatekeeper | Vai trò validate/sanitize của gateway (Phase 1) |
-| Health Endpoint Monitoring | Health check (Phase 4) |
-| External Configuration Store | Externalized config (Phase 5) |
-| Queue-Based Load Leveling | Lợi ích có sẵn của emit qua RMQ — queue làm buffer khi tải đột biến |
-| Competing Consumers | 2+ replicas cùng nghe 1 queue (RMQ mặc định) — gặp ở Phase 5 khi scale |
-| Strangler Fig | Chính là cách đang migrate REST → RMQ từng module |
-| Index Table | Prisma `@@index` — đã dùng |
-| Materialized View | Alternative nhẹ cho CQRS |
-| Throttling | Cặp với Rate Limiting (Phase 1) |
+| Gatekeeper                                 | Vai trò validate/sanitize của gateway (Phase 1)                                                                               |
+| Health Endpoint Monitoring                 | Health check (Phase 4)                                                                                                        |
+| External Configuration Store               | Externalized config (Phase 5)                                                                                                 |
+| Queue-Based Load Leveling                  | Lợi ích có sẵn của emit qua RMQ — queue làm buffer khi tải đột biến                                                           |
+| Competing Consumers                        | 2+ replicas cùng nghe 1 queue (RMQ mặc định) — gặp ở Phase 5 khi scale                                                        |
+| Strangler Fig                              | Chính là cách đang migrate REST → RMQ từng module                                                                             |
+| Index Table                                | Prisma `@@index` — đã dùng                                                                                                    |
+| Materialized View                          | Alternative nhẹ cho CQRS                                                                                                      |
+| Throttling                                 | Cặp với Rate Limiting (Phase 1)                                                                                               |
 
 **Azure có mà roadmap chưa nhắc — đáng biết, tra khi cần:**
 
-| Pattern | Khi nào cần trong project |
-|---|---|
-| Claim Check | Payload RMQ lớn (file, ảnh) → lưu storage, gửi reference qua queue |
-| Valet Key | Upload ảnh product → presigned URL S3/R2, không đi qua backend |
-| Federated Identity | Thêm login Zalo (cho client miniapp — `auth.zalo_login`: verify Zalo token → phát JWT của mình) / Google OAuth vào auth-service |
-| Anti-Corruption Layer | Tích hợp payment gateway thật / hệ thống legacy — lớp adapter cách ly |
-| Leader Election | Outbox worker chạy nhiều replicas (đã note ở 7.3) |
-| Asynchronous Request-Reply | HTTP 202 + polling status endpoint — khi client cần theo dõi tác vụ chạy lâu |
+| Pattern                    | Khi nào cần trong project                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Claim Check                | Payload RMQ lớn (file, ảnh) → lưu storage, gửi reference qua queue                                                              |
+| Valet Key                  | Upload ảnh product → presigned URL S3/R2, không đi qua backend                                                                  |
+| Federated Identity         | Thêm login Zalo (cho client miniapp — `auth.zalo_login`: verify Zalo token → phát JWT của mình) / Google OAuth vào auth-service |
+| Anti-Corruption Layer      | Tích hợp payment gateway thật / hệ thống legacy — lớp adapter cách ly                                                           |
+| Leader Election            | Outbox worker chạy nhiều replicas (đã note ở 7.3)                                                                               |
+| Asynchronous Request-Reply | HTTP 202 + polling status endpoint — khi client cần theo dõi tác vụ chạy lâu                                                    |
 
 **Azure có nhưng CHƯA cần cho quy mô này** (đọc hiểu là đủ): Geode, Deployment
 Stamps, Sharding, Priority Queue, Sequential Convoy, Scheduler Agent Supervisor,
@@ -967,17 +1026,17 @@ học được tư duy.
 
 ### Tools tham khảo
 
-| Chủ đề | Tool |
-|---|---|
-| Broker | RabbitMQ (đang dùng), Kafka (đọc thêm) |
-| Tracing | OpenTelemetry + Jaeger |
-| Logging | Loki + Grafana, ELK stack |
-| Metrics | Prometheus + Grafana |
-| Circuit Breaker | opossum (Node.js) |
-| Contract Test | Pact |
-| Feature Flag | Unleash, LaunchDarkly |
-| Service Mesh | Istio, Linkerd |
-| Container Orchestration | Kubernetes |
+| Chủ đề                  | Tool                                   |
+| ----------------------- | -------------------------------------- |
+| Broker                  | RabbitMQ (đang dùng), Kafka (đọc thêm) |
+| Tracing                 | OpenTelemetry + Jaeger                 |
+| Logging                 | Loki + Grafana, ELK stack              |
+| Metrics                 | Prometheus + Grafana                   |
+| Circuit Breaker         | opossum (Node.js)                      |
+| Contract Test           | Pact                                   |
+| Feature Flag            | Unleash, LaunchDarkly                  |
+| Service Mesh            | Istio, Linkerd                         |
+| Container Orchestration | Kubernetes                             |
 
 ---
 
@@ -986,37 +1045,45 @@ học được tư duy.
 Copy checklist này ra 1 file riêng (`docs/progress.md`) và tick dần:
 
 ### Phase 0
-- [ ] Migrate product-service hết modules
-- [ ] Migrate order-service
-- [ ] Migrate inventory-service
-- [ ] Chiến lược xoá per-entity (5.5) + note soft-delete.md
-- [ ] Coverage ≥ 60% mọi service
-- [ ] Integration test đầu tiên với testcontainers
-- [ ] Structured logging với pino
+
+- [x] Migrate product-service hết modules
+- [x] Migrate order-service
+- [x] Migrate inventory-service
+- [x] Chiến lược xoá per-entity (5.5) + note soft-delete.md
+- [x] Coverage ≥ 60% mọi service (`coverageThreshold` 65/50/65 chặn tụt)
+- [x] Integration test đầu tiên với testcontainers (inventory)
+- [x] Structured logging với pino
 
 ### Phase 1
-- [ ] JwtAuthGuard global ở gateway
-- [ ] @Public() decorator
-- [ ] Service-to-service auth (shared secret)
-- [ ] Rate limiting với throttler
-- [ ] Helmet + CORS whitelist
+
+- [x] JwtAuthGuard global ở gateway
+- [x] @Public() decorator
+- [x] Service-to-service auth (shared secret `x-internal-token`)
+- [x] Rate limiting với throttler
+- [x] Helmet + CORS whitelist
+- [ ] Docker secrets cho compose (6.5 — phần duy nhất Phase 1 còn nợ)
 
 ### Phase 2
-- [ ] notification-service với emit event
-- [ ] Outbox table + worker
-- [ ] Idempotency với eventId
-- [ ] DLQ config + replay endpoint
-- [ ] Saga Order flow với compensating action
+
+- [x] notification-service với emit event (7.1 + 7.2)
+- [x] Outbox table + worker (7.3)
+- [x] Idempotency với eventId (7.4) + note `docs/patterns/idempotency.md`
+- [ ] DLQ config + replay endpoint (7.5) ← **đang tới đây**
+- [ ] Saga Order flow với compensating action (7.6)
+- [ ] Audit log qua domain events (7.7)
 
 ### Phase 3
+
 - [ ] Timeout mọi RMQ call
 - [ ] Retry với exponential backoff
+- [ ] Command ghi idempotent: TTL message RPC + Idempotency-Key (8.2b — vá bug 504-vẫn-cộng-kho)
 - [ ] Circuit Breaker với opossum
 - [ ] Bulkhead — connection pool riêng
 - [ ] Cache-Aside với Redis (kèm invalidation)
 - [ ] Graceful shutdown
 
 ### Phase 4
+
 - [ ] Correlation ID xuyên request
 - [ ] OpenTelemetry + Jaeger
 - [ ] Loki + Grafana log
@@ -1025,6 +1092,7 @@ Copy checklist này ra 1 file riêng (`docs/progress.md`) và tick dần:
 - [ ] Sentry error tracking
 
 ### Phase 5
+
 - [ ] Dockerfile multi-stage mỗi service
 - [ ] docker-compose full stack
 - [ ] K8s manifests + HPA
@@ -1032,6 +1100,7 @@ Copy checklist này ra 1 file riêng (`docs/progress.md`) và tick dần:
 - [ ] Deploy production trên cloud
 
 ### Phase 6 (optional)
+
 - [ ] CQRS thử với product
 - [ ] Event Sourcing thử với order
 - [ ] Pact contract test

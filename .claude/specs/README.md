@@ -11,11 +11,16 @@ spec để hiểu nhanh, **không phải đọc lại toàn bộ code** mỗi l�
 - Khi code đổi → **cập nhật spec ngay** (skill `/update-spec`).
 
 ## Danh sách spec
-| File | Bao phủ |
-| --- | --- |
-| [auth-service.md](auth-service.md) | `apps/auth-service` |
-| [api-gateway.md](api-gateway.md) | `apps/api-gateway` |
-| [shared-libs.md](shared-libs.md) | `libs/shared` + `libs/event-contracts` |
+| File | Bao phủ | Trạng thái |
+| --- | --- | --- |
+| [api-gateway.md](api-gateway.md) | `apps/api-gateway` | ✅ đang chạy |
+| [auth-service.md](auth-service.md) | `apps/auth-service` | ✅ đang chạy (có Outbox) |
+| [product-service.md](product-service.md) | `apps/product-service` | ✅ đang chạy |
+| [inventory-service.md](inventory-service.md) | `apps/inventory-service` | ✅ đang chạy |
+| [order-service.md](order-service.md) | `apps/order-service` | ✅ đang chạy |
+| [notification-service.md](notification-service.md) | `apps/notification-service` | ✅ đang chạy (consumer event, idempotency) |
+| [promotion-service.md](promotion-service.md) | `apps/promotion-service` | 📐 chỉ có schema, chưa có app Nest |
+| [shared-libs.md](shared-libs.md) | `libs/shared` + `libs/event-contracts` | ✅ |
 
 > Thêm service mới (vd product) → tạo `product-service.md` theo cùng khuôn, rồi
 > thêm dòng vào bảng này **và** vào `CLAUDE.md`.

@@ -1,5 +1,5 @@
 {
-  "name": "omial-market-backend",
+  "name": "navis-backend",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -17,7 +17,7 @@
     "start:order": "nest start order-service --watch",
     "start:notification": "nest start notification-service --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/apps/omial-market-backend/main",
+    "start:prod": "node dist/apps/navis-backend/main",
     "db:migrate:auth": "cd apps/auth-service && prisma migrate deploy",
     "db:push:auth": "cd apps/auth-service && prisma db push",
     "db:push:product": "cd apps/product-service && prisma db push",
@@ -30,7 +30,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./apps/omial-market-backend/test/jest-e2e.json",
+    "test:e2e": "jest --config ./apps/navis-backend/test/jest-e2e.json",
     "test:int": "jest --config ./test/jest-integration.json --runInBand"
   },
   "dependencies": {
