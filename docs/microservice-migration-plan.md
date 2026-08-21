@@ -2,7 +2,7 @@
 
 > **Trạng thái**: bản kế hoạch cấu hình. Code do dev tự implement theo checklist ở [mục 9](#9-checklist-triển-khai).
 > **Ngày**: 2026-07-14
-> **Repo**: `omial-market-backend` (NestJS monorepo)
+> **Repo**: `navis-backend` (NestJS monorepo)
 
 ---
 
